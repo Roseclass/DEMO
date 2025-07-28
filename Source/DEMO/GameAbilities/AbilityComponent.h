@@ -16,8 +16,6 @@ public:
 	UAbilityComponent();
 protected:
 public:
-	//µğÆúÆ®
-
 
 	//property
 private:
@@ -28,6 +26,9 @@ public:
 private:
 protected:
 public:
+
+	float GetDefense() const;
+	float GetPower() const;
 };
 
 

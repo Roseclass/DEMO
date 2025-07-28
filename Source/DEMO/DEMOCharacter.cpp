@@ -1,4 +1,6 @@
 #include "DEMOCharacter.h"
+#include "Global.h"
+
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -6,8 +8,15 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 
+#include "GameAbilities/AbilityComponent.h"
+#include "GameAbilities/AttributeSet_Character.h"
+
 ADEMOCharacter::ADEMOCharacter()
 {
+	//actor
+	CHelpers::CreateActorComponent<UAbilityComponent>(this, &Ability, "Ability");
+	AttributeSet = CreateDefaultSubobject<UAttributeSet_Character>(TEXT("AttributeSet"));
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
@@ -68,6 +77,17 @@ void ADEMOCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInpu
 	PlayerInputComponent->BindTouch(IE_Pressed, this, &ADEMOCharacter::TouchStarted);
 	PlayerInputComponent->BindTouch(IE_Released, this, &ADEMOCharacter::TouchStopped);
 }
+
+FGenericTeamId ADEMOCharacter::GetGenericTeamId() const
+{
+	return TeamID;
+}
+
+UAbilitySystemComponent* ADEMOCharacter::GetAbilitySystemComponent() const
+{
+	return Ability;
+}
+
 
 void ADEMOCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
