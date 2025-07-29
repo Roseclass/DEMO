@@ -119,6 +119,7 @@ void ADamageDealer::SendDamage(TSubclassOf<UGameplayEffect> EffectClass, AActor*
 			EffectContextHandle.AddInstigator(owner ? owner->GetController() : nullptr, this);
 			EffectContextHandle.AddHitResult(SweepResult);
 			context->BaseDamage = CalculateDamage(instigatorASC->GetPower());
+			context->AddOrigin(Target->GetActorLocation());
 
 			// Must use EffectToTarget for auto mmc
 			instigatorASC->ApplyGameplayEffectToTarget(EffectClass.GetDefaultObject(), hitASC, UGameplayEffect::INVALID_LEVEL, EffectContextHandle);

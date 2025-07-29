@@ -15,7 +15,7 @@ bool UGCN_DamageText::OnExecute_Implementation(AActor* MyTarget, const FGameplay
 	if (!effectContext)return false;
 
 	FTransform transform;
-	transform.SetTranslation(Parameters.Location);
+	transform.SetTranslation(effectContext->GetOrigin());
 	ADamageText* txt = GetWorld()->SpawnActorDeferred<ADamageText>(DamageTextClass, transform);
 	txt->Init(effectContext->CalculatedDamage, effectContext->bIsCritical);
 	UGameplayStatics::FinishSpawningActor(txt, transform);
