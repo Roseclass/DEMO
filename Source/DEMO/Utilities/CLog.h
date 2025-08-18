@@ -21,3 +21,10 @@ public:
 	static void Log(const UObject* InOjbect);
 	static void Log(const FString& InFuncName, int32 InLineNumber);
 };
+
+#define CheckTrue_Print(Condition, Message) \
+if (Condition) \
+{ \
+    CLog::Print(FString::Printf(TEXT("%s %s"), *FString(__FUNCTION__), TEXT(Message))); \
+    return; \
+}
