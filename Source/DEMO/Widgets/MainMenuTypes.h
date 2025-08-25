@@ -7,6 +7,7 @@
 UENUM(BlueprintType)
 enum class EMainMenuPhase : uint8
 {
+	MIN,
 	Continue,
 	NewGame,
 	LoadGame,

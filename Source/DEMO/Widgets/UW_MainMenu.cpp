@@ -6,6 +6,8 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 
+#include "SaveLoad/SaveManager.h"
+
 #include "Widgets/UW_MainMenu_SaveDataSelect.h"
 #include "Widgets/UW_MainMenu_Settings.h"
 #include "Widgets/UW_MainMenu_Confirm.h"
@@ -14,8 +16,6 @@ void UUW_MainMenu::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
-	//if(!SAVEDATA[0])
-	//	Continue_Button->SetIsEnabled(0);
 
 	SaveDataSelect->Init(ConfirmWidget);
 	SaveDataSelect->OnBackConfirmed.AddLambda([=]()
@@ -35,6 +35,22 @@ void UUW_MainMenu::NativeOnInitialized()
 void UUW_MainMenu::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	ActivatedPhaseMap.Add(EMainMenuPhase::MIN, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::Continue, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::NewGame, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::LoadGame, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::Settings, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::ExitGame, 1);
+	ActivatedPhaseMap.Add(EMainMenuPhase::MAX, 1);
+
+	if (USaveManager::GetCurrentSaveSlot().IsEmpty())
+	{
+		Location = EMainMenuPhase::NewGame;
+		ActivatedPhaseMap[EMainMenuPhase::Continue] = 0;
+		Continue_Text->SetColorAndOpacity(TextColorWhenNotActivated);
+	}
+
 	Glow();
 
 	SetFocus();
@@ -80,54 +96,70 @@ FReply UUW_MainMenu::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEven
 
 void UUW_MainMenu::Up()
 {
-	switch (Location)
+	CheckTrue(Location == EMainMenuPhase::Continue);
+	CheckTrue_Print(Location == EMainMenuPhase::MIN, "Location is MIN");
+	CheckTrue_Print(Location == EMainMenuPhase::MAX, "Location is MAX");
+
+	EMainMenuPhase temp = Location;
+
+	while (temp != EMainMenuPhase::MIN)
 	{
-	case EMainMenuPhase::Continue:return;
-		break;
-	case EMainMenuPhase::NewGame:Location = EMainMenuPhase::Continue;
-		break;
-	case EMainMenuPhase::LoadGame:Location = EMainMenuPhase::NewGame;
-		break;
-	case EMainMenuPhase::Settings:Location = EMainMenuPhase::LoadGame;
-		break;
-	case EMainMenuPhase::ExitGame:Location = EMainMenuPhase::Settings;
-		break;
-	case EMainMenuPhase::MAX: 
-	{
-		CLog::Print(FString::Printf(TEXT("%s %s"), *FString(__FUNCTION__), *CHelpers::EnumToString(FString("EMainMenuPhase"), EMainMenuPhase::MAX)));
-		return;
-		break;
+		switch (temp)
+		{
+		case EMainMenuPhase::Continue:temp = EMainMenuPhase::MIN;
+			break;
+		case EMainMenuPhase::NewGame:temp = EMainMenuPhase::Continue;
+			break;
+		case EMainMenuPhase::LoadGame:temp = EMainMenuPhase::NewGame;
+			break;
+		case EMainMenuPhase::Settings:temp = EMainMenuPhase::LoadGame;
+			break;
+		case EMainMenuPhase::ExitGame:temp = EMainMenuPhase::Settings;
+			break;
+		default:break;
+		}
+
+		if (ActivatedPhaseMap[temp])break;
 	}
-	default:
-		break;
-	}
-	
+
+	CheckTrue(temp == EMainMenuPhase::MIN);
+
+	Location = temp;
+
 	Glow();
 }
 
 void UUW_MainMenu::Down()
 {
-	switch (Location)
+	CheckTrue(Location == EMainMenuPhase::ExitGame);
+	CheckTrue_Print(Location == EMainMenuPhase::MIN, "Location is MIN");
+	CheckTrue_Print(Location == EMainMenuPhase::MAX, "Location is MAX");
+
+	EMainMenuPhase temp = Location;
+
+	while (temp != EMainMenuPhase::MAX)
 	{
-	case EMainMenuPhase::Continue:Location = EMainMenuPhase::NewGame;
-		break;
-	case EMainMenuPhase::NewGame:Location = EMainMenuPhase::LoadGame;
-		break;
-	case EMainMenuPhase::LoadGame:Location = EMainMenuPhase::Settings;
-		break;
-	case EMainMenuPhase::Settings:Location = EMainMenuPhase::ExitGame;
-		break;
-	case EMainMenuPhase::ExitGame:return;
-		break;
-	case EMainMenuPhase::MAX:
-	{
-		CLog::Print(FString::Printf(TEXT("%s %s"), *FString(__FUNCTION__), *CHelpers::EnumToString(FString("EMainMenuPhase"), EMainMenuPhase::MAX)));
-		return;
-		break;
+		switch (temp)
+		{
+		case EMainMenuPhase::Continue:temp = EMainMenuPhase::NewGame;
+			break;
+		case EMainMenuPhase::NewGame:temp = EMainMenuPhase::LoadGame;
+			break;
+		case EMainMenuPhase::LoadGame:temp = EMainMenuPhase::Settings;
+			break;
+		case EMainMenuPhase::Settings:temp = EMainMenuPhase::ExitGame;
+			break;
+		case EMainMenuPhase::ExitGame:temp = EMainMenuPhase::MAX;
+			break;
+		default:break;
+		}
+
+		if (ActivatedPhaseMap[temp])break;
 	}
-	default:
-		break;
-	}
+
+	CheckTrue(temp == EMainMenuPhase::MAX);
+
+	Location = temp;
 
 	Glow();
 }
@@ -185,27 +217,48 @@ void UUW_MainMenu::ShowMainMenu()
 
 	SetFocus();
 
+	// check Continue
+	if (USaveManager::GetCurrentSaveSlot().IsEmpty())
+	{
+		Location = EMainMenuPhase::NewGame;
+		ActivatedPhaseMap[EMainMenuPhase::Continue] = 0;
+		Continue_Text->SetColorAndOpacity(
+			ActivatedPhaseMap[EMainMenuPhase::Continue] ? TextColorWhenActivated : TextColorWhenNotActivated);
+	}
+
 	Continue_Background->SetVisibility(ESlateVisibility::Visible);
 	Continue_Frame->SetVisibility(ESlateVisibility::Visible);
 	Continue_Text->SetVisibility(ESlateVisibility::Visible);
+	Continue_Text->SetColorAndOpacity(
+		ActivatedPhaseMap[EMainMenuPhase::Continue] ? TextColorWhenActivated : TextColorWhenNotActivated);
 
 	NewGame_Background->SetVisibility(ESlateVisibility::Visible);
 	NewGame_Frame->SetVisibility(ESlateVisibility::Visible);
 	NewGame_Text->SetVisibility(ESlateVisibility::Visible);
+	NewGame_Text->SetColorAndOpacity(
+		ActivatedPhaseMap[EMainMenuPhase::NewGame] ? TextColorWhenActivated : TextColorWhenNotActivated);
 
 	LoadGame_Background->SetVisibility(ESlateVisibility::Visible);
 	LoadGame_Frame->SetVisibility(ESlateVisibility::Visible);
 	LoadGame_Text->SetVisibility(ESlateVisibility::Visible);
+	LoadGame_Text->SetColorAndOpacity(
+		ActivatedPhaseMap[EMainMenuPhase::LoadGame] ? TextColorWhenActivated : TextColorWhenNotActivated);
 
 	Settings_Background->SetVisibility(ESlateVisibility::Visible);
 	Settings_Frame->SetVisibility(ESlateVisibility::Visible);
 	Settings_Text->SetVisibility(ESlateVisibility::Visible);
+	Settings_Text->SetColorAndOpacity(
+		ActivatedPhaseMap[EMainMenuPhase::Settings] ? TextColorWhenActivated : TextColorWhenNotActivated);
 
 	ExitGame_Background->SetVisibility(ESlateVisibility::Visible);
 	ExitGame_Frame->SetVisibility(ESlateVisibility::Visible);
 	ExitGame_Text->SetVisibility(ESlateVisibility::Visible);
+	ExitGame_Text->SetColorAndOpacity(
+		ActivatedPhaseMap[EMainMenuPhase::ExitGame] ? TextColorWhenActivated : TextColorWhenNotActivated);
 
 	FocusCatcher->SetVisibility(ESlateVisibility::Visible);
+
+	Glow();
 }
 
 void UUW_MainMenu::HideMainMenu()

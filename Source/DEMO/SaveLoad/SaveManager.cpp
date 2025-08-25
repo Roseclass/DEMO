@@ -3,6 +3,7 @@
 
 static const FString kMetadataSaveSlot = "SaveGameMetadata";
 
+TArray<FSaveMetaData> USaveManager::CurrentSavedGamesMetaData;
 FString USaveManager::CurrentSaveSlot;
 TArray<TWeakInterfacePtr<ISave>> USaveManager::SaveInterfaces;
 
@@ -10,53 +11,86 @@ void USaveManager::Init()
 {
 	// Make sure the metadata file exists incase the game has never been ran
 	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
 	if (!saveMetaData)
 	{
 		// since the metadata file doesn't exist, we need to create one
 		saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+		UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
 	}
 	else
 	{
-		TMap<int32, const FSaveMetaData* > orderMap;
-		for (const auto& tuple : saveMetaData->SavedGamesMetaData)
-			orderMap.Add(tuple.Value.Order, &tuple.Value);
+		// find empty slot
+		bool flag = 0;
+		for (const auto& arr : saveMetaData->SavedGamesMetaData)
+		{
+			if (arr.bIsEmpty)
+			{
+				flag = 1;
+				break;
+			}
+		}
 
-		int32 idx = 0;
-		for (const auto& tuple : orderMap)
-			saveMetaData->SavedGamesMetaData.FindOrAdd(tuple.Value->SlotName).Order = idx++;
+		// this is no empty slot, make new empty meta slot for UI
+		if (!flag)
+		{
+			int32 idx = saveMetaData->SavedGamesMetaData.Add(FSaveMetaData());
+			saveMetaData->SavedGamesMetaData[idx].SlotName = FString();
+			saveMetaData->SavedGamesMetaData[idx].Date = FDateTime::Now();
+			saveMetaData->SavedGamesMetaData[idx].bIsEmpty = 1;
+		}// this is not real data
 	}
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
 
-	CurrentSaveSlot = saveMetaData->ActiveSlot;
-}
-
-FString USaveManager::CreateNewData(FString InSlotName)
-{
-	// update the metadata file with the new slot
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
-	// check NewSlotName
-	if (InSlotName.IsEmpty())
-		InSlotName = "Slot" + FString::FromInt(saveMetaData->SavedGamesMetaData.Num());
-
-	// Create a new save game data instace
-	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
-
-	// save the game to the curren slot
-	UGameplayStatics::SaveGameToSlot(saveGameData, InSlotName, 0);
-
-	FSaveMetaData& saveMetadata = saveMetaData->SavedGamesMetaData.FindOrAdd(InSlotName);
-	saveMetadata.SlotName = InSlotName;
-	saveMetadata.Date = FDateTime::Now();
+	// at least 5slots
+	while (saveMetaData->SavedGamesMetaData.Num() < 5)
+	{
+		int32 idx = saveMetaData->SavedGamesMetaData.Add(FSaveMetaData());
+		saveMetaData->SavedGamesMetaData[idx].SlotName = FString();
+		saveMetaData->SavedGamesMetaData[idx].Date = FDateTime::Now();
+		saveMetaData->SavedGamesMetaData[idx].bIsEmpty = 1;
+	}
 
 	// save the changes to the metadata file
 	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
 
-	return InSlotName;
+	CurrentSavedGamesMetaData = saveMetaData->SavedGamesMetaData;
+	CurrentSaveSlot = saveMetaData->ActiveSlot;
 }
 
-void USaveManager::SaveData()
+ESaveLoadResult USaveManager::CreateNewData(int32 InSlotIndex, FString InSlotName)
+{
+	// check SlotIndex
+	if (!CurrentSavedGamesMetaData.IsValidIndex(InSlotIndex))
+		return ESaveLoadResult::IndexError;
+
+	if (InSlotName.IsEmpty())
+		InSlotName = "DATA" + FString::FromInt(InSlotIndex);
+
+	// delete old Data
+	if (UGameplayStatics::DoesSaveGameExist(CurrentSavedGamesMetaData[InSlotIndex].SlotName, 0))
+		USaveManager::DeleteData(InSlotIndex);
+
+	// Create a new save game data instace
+	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
+	// save the game to the InSlotName slot
+	if (!UGameplayStatics::SaveGameToSlot(saveGameData, InSlotName, 0))
+		return ESaveLoadResult::Failure_Game;
+
+	// update metaDatas
+	CurrentSavedGamesMetaData[InSlotIndex].SlotName = InSlotName;
+	CurrentSavedGamesMetaData[InSlotIndex].Date = FDateTime::Now();
+	CurrentSavedGamesMetaData[InSlotIndex].bIsEmpty = 0;
+
+	// update the metadata file with the new slot
+	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+	saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+	saveMetaData->ActiveSlot = CurrentSaveSlot;
+	// save the changes to the metadata file
+	if (!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+		return ESaveLoadResult::Failure_Meta;
+	return ESaveLoadResult::Success;
+}
+
+ESaveLoadResult USaveManager::SaveData()
 {
 	// Clear old entries
 	SaveInterfaces.Empty();
@@ -81,33 +115,89 @@ void USaveManager::SaveData()
 	}
 
 	// save the game to the current slot
-	UGameplayStatics::SaveGameToSlot(saveGameData, CurrentSaveSlot, 0);
+	if(!UGameplayStatics::SaveGameToSlot(saveGameData, CurrentSaveSlot, 0))
+		return ESaveLoadResult::Failure_Game;
 
+	// find current slot
+	for (int32 i = 0; i < CurrentSavedGamesMetaData.Num(); i++)
+	{
+		if (CurrentSavedGamesMetaData[i].SlotName != CurrentSaveSlot)continue;
+		CurrentSavedGamesMetaData[i].Date = FDateTime::Now();
+		CurrentSavedGamesMetaData[i].bIsEmpty = 0;
+
+		// update the metadata file with the new slot
+		USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+		saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+		saveMetaData->ActiveSlot = CurrentSaveSlot;
+		// save the changes to the metadata file
+		if(!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+			return ESaveLoadResult::Failure_Meta;
+		return ESaveLoadResult::Success;
+	}
+
+	// if its not exist, find empty and create new 
+	for (int32 i = 0; i < CurrentSavedGamesMetaData.Num(); i++)
+	{
+		if (!CurrentSavedGamesMetaData[i].bIsEmpty)continue;
+		CurrentSavedGamesMetaData[i].SlotName = CurrentSaveSlot;
+		CurrentSavedGamesMetaData[i].Date = FDateTime::Now();
+		CurrentSavedGamesMetaData[i].bIsEmpty = 0;
+
+		// update the metadata file with the new slot
+		USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+		saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+		saveMetaData->ActiveSlot = CurrentSaveSlot;
+		// save the changes to the metadata file
+		if (!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+			return ESaveLoadResult::Failure_Meta;
+		return ESaveLoadResult::Success;
+	}
+
+	// no matched slot, no place to save, Add new slot
+	CurrentSavedGamesMetaData.Add(FSaveMetaData());
+	CurrentSavedGamesMetaData[CurrentSavedGamesMetaData.Num() - 1].SlotName = CurrentSaveSlot;
+	CurrentSavedGamesMetaData[CurrentSavedGamesMetaData.Num() - 1].Date = FDateTime::Now();
+	CurrentSavedGamesMetaData[CurrentSavedGamesMetaData.Num() - 1].bIsEmpty = 0;
+	
 	// update the metadata file with the new slot
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
-	FSaveMetaData& saveMetadata = saveMetaData->SavedGamesMetaData.FindOrAdd(CurrentSaveSlot);
-	saveMetadata.SlotName = CurrentSaveSlot;
-	saveMetadata.Date = FDateTime::Now();
-
+	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+	saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+	saveMetaData->ActiveSlot = CurrentSaveSlot;
 	// save the changes to the metadata file
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
+	if (!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+		return ESaveLoadResult::Failure_Meta;
+	return ESaveLoadResult::Success;
 }
 
-void USaveManager::LoadData(FString InSlotName)
-{
-	if (InSlotName.IsEmpty())
-		InSlotName = CurrentSaveSlot;
+ESaveLoadResult USaveManager::LoadData(int32 InSlotIndex)
+{	
+	// check SlotIndex
+	if (!CurrentSavedGamesMetaData.IsValidIndex(InSlotIndex))
+		return ESaveLoadResult::IndexError;
 
-	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::LoadGameFromSlot(InSlotName, 0));
+	CurrentSaveSlot = CurrentSavedGamesMetaData[InSlotIndex].SlotName;
+	CurrentSavedGamesMetaData[InSlotIndex].Date = FDateTime::Now();
+	CurrentSavedGamesMetaData[InSlotIndex].bIsEmpty = 0;
+
+	// update the metadata file with the new slot
+	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+	saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+	saveMetaData->ActiveSlot = CurrentSaveSlot;
+	// save the changes to the metadata file
+	if (!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+		return ESaveLoadResult::Failure_Meta;
+
+	// start load sequence
+	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::LoadGameFromSlot(saveMetaData->ActiveSlot, 0));
 
 	if (!saveGameData)
 	{
-		// no saves exist yet for this slot. save a default one.
-		InSlotName = CreateNewData(FString());
-
-		// Reload it
-		saveGameData = Cast<USaveGameData>(UGameplayStatics::LoadGameFromSlot(CurrentSaveSlot, 0));
+		// Create a new save game data instace
+		saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
+		// save the game to the InSlotName slot
+		if (!UGameplayStatics::SaveGameToSlot(saveGameData, saveMetaData->ActiveSlot, 0))
+			return ESaveLoadResult::Failure_Game;
+		CLog::Print(FString(__FUNCTION__) + " slot" + FString::FromInt(InSlotIndex) + " has no data");
 	}
 
 	// Loop over all the actors that need to load data nad load their data
@@ -116,74 +206,34 @@ void USaveManager::LoadData(FString InSlotName)
 		if (!i.GetObject())continue;
 		i->OnAfterLoad(saveGameData);
 	}
-
-	CurrentSaveSlot = InSlotName;
-
-	// update the metadata file with the new slot
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-	saveMetaData->ActiveSlot = InSlotName;
-
-	FSaveMetaData& saveMetadata = saveMetaData->SavedGamesMetaData.FindOrAdd(CurrentSaveSlot);
-	saveMetadata.SlotName = CurrentSaveSlot;
-	saveMetadata.Date = FDateTime::Now();
-
-	// save the changes to the metadata file
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
+	return ESaveLoadResult::Success;
 }
 
-void USaveManager::DeleteData(const FString SlotName)
+ESaveLoadResult USaveManager::DeleteData(int32 InSlotIndex)
 {
-	// Delete the slot
-	UGameplayStatics::DeleteGameInSlot(SlotName, 0);
+	// check SlotIndex
+	if (!CurrentSavedGamesMetaData.IsValidIndex(InSlotIndex))
+		return ESaveLoadResult::IndexError;
 
-	if (CurrentSaveSlot == SlotName)
+	FString slotName = CurrentSavedGamesMetaData[InSlotIndex].SlotName;
+
+	// Delete the slot
+	if(!UGameplayStatics::DeleteGameInSlot(slotName, 0))
+		return ESaveLoadResult::Failure_Game;
+
+	if (CurrentSaveSlot == slotName)
 		CurrentSaveSlot = FString();
 
-	// Loading the metadata file
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
+	CurrentSavedGamesMetaData[InSlotIndex].bIsEmpty = 1;
 
-	saveMetaData->SavedGamesMetaData.Remove(SlotName);
-	if (saveMetaData->ActiveSlot == SlotName)
-		saveMetaData->ActiveSlot = FString();
-
+	// update the metadata file with the new slot
+	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::CreateSaveGameObject(USaveGameMetaData::StaticClass()));
+	saveMetaData->SavedGamesMetaData = CurrentSavedGamesMetaData;
+	saveMetaData->ActiveSlot = CurrentSaveSlot;
 	// Save the metadata slot
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
-}
-
-void USaveManager::ActivateData()
-{
-	// update the metadata file with the new slot
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
-	FSaveMetaData& saveMetadata = saveMetaData->SavedGamesMetaData.FindOrAdd(CurrentSaveSlot);
-	saveMetadata.SlotName = CurrentSaveSlot;
-	saveMetadata.Date = FDateTime::Now();
-	saveMetaData->ActiveSlot = CurrentSaveSlot;;
-
-	// save the changes to the metadata file
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
-}
-
-void USaveManager::ResetData()
-{
-	// Create a new save game data instace
-	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
-
-	// save the game to the curren slot
-	UGameplayStatics::SaveGameToSlot(saveGameData, CurrentSaveSlot, 0);
-
-	// update the metadata file with the new slot
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
-	FSaveMetaData& saveMetadata = saveMetaData->SavedGamesMetaData.FindOrAdd(CurrentSaveSlot);
-	saveMetadata.SlotName = CurrentSaveSlot;
-	saveMetadata.Date = FDateTime::Now();
-
-	if(saveMetaData->ActiveSlot == CurrentSaveSlot) 
-		saveMetaData->ActiveSlot = FString();
-
-	// save the changes to the metadata file
-	UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0);
+	if (!UGameplayStatics::SaveGameToSlot(saveMetaData, kMetadataSaveSlot, 0))
+		return ESaveLoadResult::Failure_Meta;
+	return ESaveLoadResult::Success;
 }
 
 void USaveManager::SetCurrentSaveSlot(const FString& slot)
@@ -198,33 +248,17 @@ FString USaveManager::GetCurrentSaveSlot()
 
 TArray<FSaveMetaData> USaveManager::GetAllSaveMetaData()
 {
-	TArray<FSaveMetaData> metadata;
-
-	// Loading the metadata file
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-
-	metadata.Reserve(saveMetaData->SavedGamesMetaData.Num());
-
-	// Add each saved game's metadat to the return array
-	for (const auto& i : saveMetaData->SavedGamesMetaData)
-	{
-		metadata.Push(i.Value);
-	}
-
-	return metadata;
+	return CurrentSavedGamesMetaData;
 }
 
 int32 USaveManager::GetMaxSize()
 {
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-	if (!saveMetaData)return 0;
-	return saveMetaData->SavedGamesMetaData.Num();
+	return CurrentSavedGamesMetaData.Num();
 }
 
-bool USaveManager::IsActivate(const FString& slot)
+bool USaveManager::IsEmpty(int32 InSlotIndex)
 {
-	// Loading the metadata file
-	USaveGameMetaData* saveMetaData = Cast<USaveGameMetaData>(UGameplayStatics::LoadGameFromSlot(kMetadataSaveSlot, 0));
-	if (!saveMetaData)return 0;
-	return saveMetaData->ActiveSlot == slot;
+	if (!CurrentSavedGamesMetaData.IsValidIndex(InSlotIndex))
+		return 0;
+	return CurrentSavedGamesMetaData[InSlotIndex].bIsEmpty;
 }

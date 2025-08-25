@@ -34,6 +34,7 @@ public:
 private:
 	bool bIsHide;
 	EMainMenuPhase Location = EMainMenuPhase::Continue;
+	TMap<EMainMenuPhase, bool> ActivatedPhaseMap;
 protected:
 	//Continue
 	UPROPERTY(BlueprintReadOnly, Category = "MainMenu", meta = (BindWidget))
@@ -96,6 +97,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data")
 		float OpacityWhenNotSelected = 0.4;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data")
+		FSlateColor TextColorWhenActivated = FSlateColor(FLinearColor(1, 1, 1, 1));
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data")
+		FSlateColor TextColorWhenNotActivated = FSlateColor(FLinearColor(0.2, 0.2, 0.2, 1));
 
 
 	//Children

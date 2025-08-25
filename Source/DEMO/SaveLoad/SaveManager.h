@@ -13,6 +13,17 @@
  * 
  */
 
+UENUM(BlueprintType)
+enum class ESaveLoadResult : uint8
+{
+	Success,
+	Failure_Meta,
+	Failure_Game,
+	IndexError,
+	NameError,
+	MAX
+};
+
 USTRUCT(BlueprintType)
 struct FSaveMetaData
 {
@@ -27,9 +38,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Default")
 		FDateTime Date;
 
-	UPROPERTY(VisibleAnywhere, Category = "Default")
-		int32 Order;
+	//
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Default")
+		bool bIsEmpty = 1;
 };
+
 
 UCLASS()
 class DEMO_API USaveGameMetaData : public USaveGame
@@ -38,7 +51,7 @@ class DEMO_API USaveGameMetaData : public USaveGame
 
 public:
 	UPROPERTY(VisibleAnywhere, Category = "Default")
-		TMap<FString, FSaveMetaData> SavedGamesMetaData;
+		TArray<FSaveMetaData> SavedGamesMetaData;
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 		FString ActiveSlot;
@@ -59,6 +72,8 @@ class DEMO_API USaveManager : public UObject
 	//property
 private:
 	// the current save slot
+	static TArray<FSaveMetaData> CurrentSavedGamesMetaData;
+	// the current save slot
 	static FString CurrentSaveSlot;
 	// all the actors in the game which implement the save interface
 	static TArray<TWeakInterfacePtr<ISave>> SaveInterfaces;
@@ -74,47 +89,39 @@ public:
 
 	// Save the current state of the game
 	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static FString CreateNewData(FString InSlotName);
+		static ESaveLoadResult CreateNewData(int32 InSlotIndex, FString InSlotName);
 
 	// Save the current state of the game
 	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static void SaveData();
+		static ESaveLoadResult SaveData();
 
 	// Loads the current state of the game
 	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static void LoadData(FString InSlotName);
+		static ESaveLoadResult LoadData(int32 InSlotIndex);
 
 	// Deletes the specified slot
 	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static void DeleteData(const FString SlotName);
+		static ESaveLoadResult DeleteData(int32 InSlotIndex);
 
-	// Activate Current Slot Data
-	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static void ActivateData();
-
-	// Reset Current Slot Data
-	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
-		static void ResetData();
-
-	// Sets the current save slot to the specified value
+	// Set the current save slot to the specified value
 	UFUNCTION(BlueprintCallable, Category = "SaveLoad")
 		static void SetCurrentSaveSlot(const FString& slot);
 
-	// Sets the current save slot to the specified value
+	// Set the current save slot to the specified value
 	UFUNCTION(BlueprintPure, Category = "SaveLoad")
 		static FString GetCurrentSaveSlot();
 
-	// Gets all the saved game
+	// Get all the saved game
 	UFUNCTION(BlueprintPure, Category = "SaveLoad")
 		static TArray<FSaveMetaData> GetAllSaveMetaData();
 
-	// Gets max size of slot
+	// Get max size of slot
 	UFUNCTION(BlueprintPure, Category = "SaveLoad")
 		static int32 GetMaxSize();
 
-	// Gets max size of slot
+	// 
 	UFUNCTION(BlueprintPure, Category = "SaveLoad")
-		static bool IsActivate(const FString& slot);
+		static bool IsEmpty(int32 InSlotIndex);
 };
 
 /*
