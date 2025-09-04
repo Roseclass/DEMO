@@ -32,20 +32,21 @@ void UAT_MontageNotifyEvent::Activate()
 	CheckNull(Ability);
 
 	bool bPlayedMontage = false;
-	UAbilityComponent* skillComp = GetTargetAbilityComp();
+	UAbilityComponent* ASC = GetTargetAbilityComp();
 
-	if (skillComp)
+	if (ASC)
 	{
 		const FGameplayAbilityActorInfo* ActorInfo = Ability->GetCurrentActorInfo();
 		UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
 		if (AnimInstance != nullptr)
 		{
-			// Bind to event callback
-			EventHandle = skillComp->AddGameplayEventTagContainerDelegate(EventTags, FGameplayEventTagMulticastDelegate::FDelegate::CreateUObject(this, &UAT_MontageNotifyEvent::OnGameplayEvent));
+			// 이벤트 콜백에 바인딩한다
+			EventHandle = ASC->AddGameplayEventTagContainerDelegate(EventTags, FGameplayEventTagMulticastDelegate::FDelegate::CreateUObject(this, &UAT_MontageNotifyEvent::OnGameplayEvent));
 
-			if (skillComp->PlayMontage(Ability, Ability->GetCurrentActivationInfo(), MontageToPlay, Rate, StartSection) > 0.f)
+			if (ASC->PlayMontage(Ability, Ability->GetCurrentActivationInfo(), MontageToPlay, Rate, StartSection) > 0.f)
 			{
-				// Playing a montage could potentially fire off a callback into game code which could kill this ability! Early out if we are  pending kill.
+				// 몽타주를 재생하면 게임 코드 쪽으로 콜백이 발생할 수 있고, 이로 인해 이 어빌리티가 종료될 수도 있다!
+				// Pending Kill 상태라면 조기에 함수 실행을 중단한다
 				if (ShouldBroadcastAbilityTaskDelegates() == false)
 				{
 					return;
@@ -71,17 +72,17 @@ void UAT_MontageNotifyEvent::Activate()
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("UGDAbilityTask_PlayMontageAndWaitForEvent call to PlayMontage failed!"));
+			CLog::Print("UAT_MontageNotifyEvent::Activate call to PlayMontage failed!");
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGDAbilityTask_PlayMontageAndWaitForEvent called on invalid AbilitySystemComponent"));
+		CLog::Print("UAT_MontageNotifyEvent::Activate called on invalid AbilitySystemComponent");
 	}
 
 	if (!bPlayedMontage)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UGDAbilityTask_PlayMontageAndWaitForEvent called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay), *InstanceName.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("UAT_MontageNotifyEvent::Activate called in Ability %s failed to play montage %s; Task Instance Name %s."), *Ability->GetName(), *GetNameSafe(MontageToPlay), *InstanceName.ToString());
 		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			//ABILITY_LOG(Display, TEXT("%s: OnCancelled"), *GetName());
@@ -103,10 +104,11 @@ void UAT_MontageNotifyEvent::ExternalCancel()
 
 void UAT_MontageNotifyEvent::OnDestroy(bool AbilityEnded)
 {
-	// Note: Clearing montage end delegate isn't necessary since its not a multicast and will be cleared when the next montage plays.
-	// (If we are destroyed, it will detect this and not do anything)
+	// 참고: 이 몽타주 종료 델리게이트는 멀티캐스트가 아니기 때문에 굳이 초기화할 필요가 없다.
+	// 다음 몽타주가 재생될 때 자동으로 초기화된다.
+	// (만약 이 오브젝트가 파괴된다면, 이를 감지하고 아무 작업도 하지 않는다)
 
-	// This delegate, however, should be cleared as it is a multicast
+	// 하지만 아래의 델리게이트는 멀티캐스트이므로 명시적으로 초기화해줘야 한다
 	if (Ability)
 	{
 		Ability->OnGameplayAbilityCancelled.Remove(CancelledHandle);
@@ -134,7 +136,7 @@ void UAT_MontageNotifyEvent::OnMontageBlendingOut(UAnimMontage* Montage, bool bI
 		{
 			AbilitySystemComponent->ClearAnimatingAbility(Ability);
 
-			// Reset AnimRootMotionTranslationScale
+			// AnimRootMotionTranslationScale 값을 초기화한다
 			ACharacter* Character = Cast<ACharacter>(GetAvatarActor());
 			if (Character && (Character->GetLocalRole() == ROLE_Authority ||
 				(Character->GetLocalRole() == ROLE_AutonomousProxy && Ability->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted)))
@@ -163,11 +165,11 @@ void UAT_MontageNotifyEvent::OnMontageBlendingOut(UAnimMontage* Montage, bool bI
 
 void UAT_MontageNotifyEvent::OnAbilityCancelled()
 {
-	// TODO: Merge this fix back to engine, it was calling the wrong callback
+	// TODO: 이 수정사항을 엔진에 다시 병합할 것. 잘못된 콜백을 호출하고 있었다
 
 	if (StopPlayingMontage())
 	{
-		// Let the BP handle the interrupt as well
+		// 블루프린트에서도 인터럽트를 처리하도록 한다
 		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnCancelled.Broadcast(FGameplayTag(), FGameplayEventData());
@@ -190,7 +192,7 @@ void UAT_MontageNotifyEvent::OnMontageEnded(UAnimMontage* Montage, bool bInterru
 
 void UAT_MontageNotifyEvent::OnGameplayEvent(FGameplayTag EventTag, const FGameplayEventData* Payload)
 {
-	//TODO:: if cooldown returns fail
+	// TODO: 쿨다운이 실패를 반환할 경우 처리
 	//if (ShouldBroadcastAbilityTaskDelegates())
 	{
 		FGameplayEventData TempData = *Payload;
@@ -208,14 +210,14 @@ bool UAT_MontageNotifyEvent::StopPlayingMontage()
 	UAnimInstance* AnimInstance = ActorInfo->GetAnimInstance();
 	if (!AnimInstance)return false;
 
-	// Check if the montage is still playing
-	// The ability would have been interrupted, in which case we should automatically stop the montage
+	// 몽타주가 아직 재생 중인지 확인
+	// 어빌리티가 인터럽트되었을 경우, 몽타주를 자동으로 중지시켜야 한다
 	if (AbilitySystemComponent && Ability)
 	{
 		if (AbilitySystemComponent->GetAnimatingAbility() == Ability
 			&& AbilitySystemComponent->GetCurrentMontage() == MontageToPlay)
 		{
-			// Unbind delegates so they don't get called as well
+			// 델리게이트를 언바인드하여 호출되지 않도록 한다
 			FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(MontageToPlay);
 			if (MontageInstance)
 			{

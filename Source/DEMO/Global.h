@@ -3,7 +3,7 @@
 #include "DrawDebugHelpers.h"
 
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetsystemLibrary.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/KismetStringLibrary.h"
 
 #include "Utilities/CHelpers.h"

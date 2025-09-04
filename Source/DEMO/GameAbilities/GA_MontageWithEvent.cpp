@@ -13,7 +13,7 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	// Play montage and wait for event
+	// 몽타주를 재생하고 이벤트를 기다린다
 	UAT_MontageNotifyEvent* Task = UAT_MontageNotifyEvent::CreateMontageNotifyEvent(this, NAME_None, Montage, FGameplayTagContainer(), 1.0f, NAME_None, false, 1.0f);
 	Task->OnBlendOut.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
 	Task->OnCompleted.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
@@ -21,7 +21,7 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	Task->OnCancelled.AddDynamic(this, &UGA_MontageWithEvent::OnCancelled);
 	Task->EventReceived.AddDynamic(this, &UGA_MontageWithEvent::EventReceived);
 
-	// ReadyForActivation() is how you activate the AbilityTask in C++. Blueprint has magic from K2Node_LatentGameplayTaskCall that will automatically call ReadyForActivation().
+	// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
 	Task->ReadyForActivation();
 }
 
