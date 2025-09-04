@@ -8,7 +8,8 @@
 #include "Components/ScrollBar.h"
 #include "Components/TextBlock.h"
 
-#include "SaveLoad/SaveManager.h"
+#include "DEMOPlayerState.h"
+#include "SaveLoadSubsystem.h"
 
 #include "Widgets/UW_MainMenu_Confirm.h"
 
@@ -62,7 +63,9 @@ void UUW_MainMenu_SaveDataSelect::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	TArray<FSaveMetaData> metaDatas = USaveManager::GetAllSaveMetaData();
+	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
+
+	TArray<FSaveMetaData> metaDatas = PS->GetAllSaveMetaData();
 
 	for (const auto& i : metaDatas)
 	{
@@ -178,6 +181,9 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 		return;
 	}
 
+	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
+	USaveLoadSubsystem* SS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+
 	// ELSE
 	if (PhaseType == EMainMenuPhase::NewGame)
 	{
@@ -187,9 +193,9 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 			if (InputCursorLocation == CURSOR_CONFIRM)
 			{
 				CheckTrue_Print(!SaveSlotNames.IsValidIndex(SlotIndex), "SlotIndex is out of range");
-				USaveManager::DeleteData(SlotIndex);
-				USaveManager::CreateNewData(SlotIndex, SaveSlotNames[SlotIndex] = Input_TextBox->GetText().ToString());				
-				USaveManager::LoadData(SlotIndex);
+				SS->DeleteData(SlotIndex);
+				SS->CreateNewData(SlotIndex, SaveSlotNames[SlotIndex] = Input_TextBox->GetText().ToString());				
+				SS->LoadData(SlotIndex);
 				OffInput();
 			}
 			else if (InputCursorLocation == CURSOR_CANCEL)
@@ -201,7 +207,7 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 				CheckTrue_Print(1, "InputCursorLocation is out of range");
 			}
 		}
-		else if (USaveManager::IsEmpty(SlotIndex))
+		else if (PS->IsEmpty(SlotIndex))
 		{
 			this->OnInput();
 		}
@@ -221,7 +227,7 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 	}
 	else if (PhaseType == EMainMenuPhase::LoadGame)
 	{
-		USaveManager::LoadData(SlotIndex);
+		SS->LoadData(SlotIndex);
 	}
 	else CheckTrue_Print(1, "Type is not Valid");
 }
