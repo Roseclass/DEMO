@@ -5,6 +5,19 @@
 
 static const FString kMetadataSaveSlot = "SaveGameMetadata";
 
+USaveGameData* USaveLoadSubsystem::CreateDefaultSaveData()
+{
+	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
+
+	saveGameData->SavedPlayerDatas;
+	saveGameData->SavedPlayerDatas.Add(FSaveData());
+	saveGameData->SavedPlayerDatas[0].DATag = FGameplayTag::RequestGameplayTag("Data.Terra");
+	
+	saveGameData->SavedEnemyDatas;
+
+	return saveGameData;
+}
+
 void USaveLoadSubsystem::Init()
 {
 	SaveWriteKey = FSaveWriteKey();
@@ -70,9 +83,9 @@ ESaveLoadResult USaveLoadSubsystem::CreateNewData(int32 InSlotIndex, FString InS
 		USaveLoadSubsystem::DeleteData(InSlotIndex);
 
 	// Create a new save game data instace
-	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
 	// save the game to the InSlotName slot
-	if (!UGameplayStatics::SaveGameToSlot(saveGameData, InSlotName, 0))
+	PS->WriteGameData(SaveWriteKey, CreateDefaultSaveData());
+	if (!UGameplayStatics::SaveGameToSlot(PS->ReadGameData(), InSlotName, 0))
 		return ESaveLoadResult::Failure_Game;
 
 	// update the metadata file with the new slot

@@ -12,6 +12,8 @@
 
 //#include "Characters/TPSCharacterData.h"
 
+class UAnimInstance;
+class USkeletalMesh;
 class UGameplayEffect;
 class UGA_BaseAbility;
 class AEventTrigger;
@@ -54,6 +56,10 @@ class DEMO_API UTPSCharacterData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 public:
+	// 서브 시스템 (레지스트리->맵)에서의 키값
+	UPROPERTY(Transient)
+		FGameplayTag DataTag;
+
 	// 캐릭터에 Init 때 복사할 데이터
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Runtime|Datas")
 		FTPSCharacterRuntimeData RuntimeData;
@@ -77,6 +83,12 @@ public:
 	// Trigger를 Attach할 SocketName
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|Action")
 		FName ActionSocketName = "Action";
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
+		TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
+		TSoftClassPtr<UAnimInstance> AnimBlueprint;
 };
 
 /*

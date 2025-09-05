@@ -36,7 +36,7 @@ public:
 	// ISave interface
 	virtual	FString GetUniqueSaveName() override;
 	virtual	void OnBeforeSave(USaveGameData* SaveData) override;
-	virtual	void OnAfterLoad(USaveGameData* const ReadData) override;
+	virtual	void OnAfterLoad(USaveGameData* ReadData) override;
 	// End of ISave interface
 
 	//property

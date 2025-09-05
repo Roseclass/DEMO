@@ -69,7 +69,11 @@ struct FSaveData
 public:
 	// character setting DA
 	UPROPERTY(VisibleAnywhere, Category = "Default")
-		TArray<FGameplayTag> DATag;
+		FGameplayTag DATag;
+
+	// character setting DA
+	UPROPERTY(VisibleAnywhere, Category = "Default")
+		FTransform Transform;
 };
 
 UCLASS()

@@ -75,7 +75,7 @@ void ABaseCharacter::OnBeforeSave(USaveGameData* SaveData)
 
 }
 
-void ABaseCharacter::OnAfterLoad(USaveGameData* const ReadData)
+void ABaseCharacter::OnAfterLoad(USaveGameData* ReadData)
 {
 
 }

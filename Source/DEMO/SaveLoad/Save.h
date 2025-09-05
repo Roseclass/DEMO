@@ -28,5 +28,5 @@ public:
 	virtual	void OnBeforeSave(USaveGameData* SaveData) = 0;
 
 	// Called after the load
-	virtual	void OnAfterLoad(USaveGameData* const ReadData) = 0;
+	virtual	void OnAfterLoad(USaveGameData* ReadData) = 0;
 };

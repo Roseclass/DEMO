@@ -29,7 +29,6 @@ ATPSCharacter::ATPSCharacter()
 void ATPSCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	Init(TempDA);
 }
 
 void ATPSCharacter::Tick(float DeltaTime)
@@ -62,9 +61,9 @@ void ATPSCharacter::OnBeforeSave(USaveGameData* SaveData)
 	GetUniqueSaveName();
 }
 
-void ATPSCharacter::OnAfterLoad(USaveGameData* const ReadData)
+void ATPSCharacter::OnAfterLoad(USaveGameData* ReadData)
 {
-
+	//TODO
 }
 
 AEventTrigger* ATPSCharacter::GetEventTrigger()
@@ -117,18 +116,22 @@ void ATPSCharacter::MoveRight(float Value)
 void ATPSCharacter::Init(UPrimaryDataAsset* DA)
 {
 	Super::Init(DA);
-	//UTPSCharacterData* tpsData = Cast<UTPSCharacterData>(DA);
-	//CheckTrue_Print(!tpsData, "tpsData cast Fail!!");
-	//RuntimeData = tpsData->RuntimeData;
-	CheckNull(DA);
-	RuntimeData = TempDA->RuntimeData;
-	RuntimeData.bInitComplete = 1;
 
-	TArray<FAbilitySpecInfo> abilities = TempDA->GrantedAbilities;
-	for (auto& i : abilities)i.SourceObject = TempDA;
+	UTPSCharacterData* tpsData = Cast<UTPSCharacterData>(DA);
+	CheckTrue_Print(!tpsData, "tpsData cast Fail!!");
+	RuntimeData = tpsData->RuntimeData;
+	RuntimeData.bInitComplete = 1;
+	GetMesh()->SetSkeletalMesh(tpsData->SkeletalMesh.Get());
+	GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+	GetMesh()->SetAnimInstanceClass(tpsData->AnimBlueprint.Get());
+
+	//asc
+	TArray<FAbilitySpecInfo> abilities = tpsData->GrantedAbilities;
+	for (auto& i : abilities)i.SourceObject = tpsData;
 	Ability->Init(abilities);
 
-	EventTrigger = GetWorld()->SpawnActorDeferred<AEventTrigger>(TempDA->ActionTrigger, FTransform());
+	//Trigger
+	EventTrigger = GetWorld()->SpawnActorDeferred<AEventTrigger>(tpsData->ActionTrigger, FTransform());
 	EventTrigger->OnBeginOverlap.AddLambda([this](FGameplayTag EventTag, const FGameplayEventData* Payload)
 		{
 			//EventTag = FGameplayTag::RequestGameplayTag(
@@ -144,7 +147,7 @@ void ATPSCharacter::Init(UPrimaryDataAsset* DA)
 		});
 	EventTrigger->OnEndOverlap;
 	UGameplayStatics::FinishSpawningActor(EventTrigger, FTransform());
-	EventTrigger->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TempDA->ActionSocketName);
+	EventTrigger->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, tpsData->ActionSocketName);
 	if (USceneComponent* Root = EventTrigger->GetRootComponent())
 		Root->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	EventTrigger->SetOwner(this);
