@@ -88,7 +88,6 @@ UAbilitySystemComponent* ADEMOCharacter::GetAbilitySystemComponent() const
 	return Ability;
 }
 
-
 void ADEMOCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
 	Jump();

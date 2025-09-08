@@ -27,6 +27,7 @@ private:
 	ATPSPhaseManager* Manager;
 	bool bInitPhaseSystem;
 	FPhaseTransitionToken ActiveToken;
+	FDelegateHandle LoadMapDelegateHandle;
 protected:
 	UPROPERTY(EditAnywhere)
 		TObjectPtr<UTPSSubsystemRegistry> Registry;
@@ -34,10 +35,10 @@ public:
 
 	//function
 private:
-	void InitializeTPSField();
 	UFUNCTION()void EnterTPS(FPhaseTransitionToken InToken, UObject* Context);
 	UFUNCTION()void ExitTPS(FPhaseTransitionToken InToken);
 protected:
 public:
+	void InitializeTPSField();
 	void InitPhaseSystem();
 };

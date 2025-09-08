@@ -1,7 +1,7 @@
 #include "Objects/TPSPhaseManager.h"
 #include "Global.h"
 
-#include "DEMOPlayerState.h"
+#include "SaveLoadSubsystem.h"
 
 #include "Characters/TPSCharacter.h"
 
@@ -12,7 +12,7 @@ ATPSPhaseManager::ATPSPhaseManager()
 
 void ATPSPhaseManager::BeginPlay()
 {
-	Super::BeginPlay();	
+	Super::BeginPlay();
 }
 
 void ATPSPhaseManager::Tick(float DeltaTime)
@@ -33,43 +33,43 @@ void ATPSPhaseManager::SpawnCharacter(UTPSCharacterData* InData, bool bLoad)
 
 	if (bLoad)
 	{
-		ADEMOPlayerState* ps = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
-		USaveGameData* data = ps->ReadGameData();
+		USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+		USaveGameData* data = SLS->ReadGameData();
 		ch->OnAfterLoad(data);
 	}
 }
 
-void ATPSPhaseManager::TrySpawnCharacter(TQueue<UTPSCharacterData*>& InQueue, bool bLoad)
+void ATPSPhaseManager::TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad)
 {
-	ADEMOPlayerState* ps = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
-	USaveGameData* data = ps->ReadGameData();
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	USaveGameData* data = SLS->ReadGameData();
 
 	while (!InQueue.IsEmpty())
 	{
-		UTPSCharacterData* top;
-		InQueue.Dequeue(top);
+		UTPSCharacterData* top = InQueue[0];
+		InQueue.RemoveAt(0);
 		for (auto i : data->SavedPlayerDatas)
 		{
-			if (i.DATag != top->DataTag)continue;
-			SpawnCharacter(top);
+			if (i.DATag != top->RuntimeData.DataTag)continue;
+			SpawnCharacter(top, bLoad);
 			top = nullptr;
 		}
 		if (!top)continue;
 
 		for (auto i : data->SavedEnemyDatas)
 		{
-			if (i.DATag != top->DataTag)continue;
-			SpawnCharacter(top);
+			if (i.DATag != top->RuntimeData.DataTag)continue;
+			SpawnCharacter(top, bLoad);
 		}
 	}
 }
 
 void ATPSPhaseManager::RequestSpawnCharacter(UTPSCharacterData* InData)
 {
-	SpawnQueue.Enqueue(InData);
+	SpawnQueue.Add(InData);
 }
 
 void ATPSPhaseManager::RequestLoadCharacter(UTPSCharacterData* InData)
 {
-	LoadQueue.Enqueue(InData);
+	LoadQueue.Add(InData);
 }

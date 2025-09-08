@@ -41,7 +41,6 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
 		UAbilityComponent* Ability;
 
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
 		UAttributeSet_Character* AttributeSet;
 public:
@@ -55,7 +54,7 @@ public:
 		float TurnRateGamepad;
 
 	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = true))
-		uint8 TeamID = 1;
+		uint8 TeamID = 1; //enum으로 변경
 
 	//function
 private:

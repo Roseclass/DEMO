@@ -20,8 +20,6 @@ public:
 	ADEMOGameState();
 protected:
 	virtual void BeginPlay() override;
-public:
-	virtual void Tick(float DeltaTime) override;
 
 	//property
 private:
@@ -35,6 +33,7 @@ public:
 
 	//function
 private:
+	void Init();
 	void ChangePhase(EGameStatePhase NewPhase, UObject* Context);
 	void ExitPhase(EGameStatePhase NewPhase);
 	void EnterPhaseState(EGameStatePhase NewPhase, UObject* Context);

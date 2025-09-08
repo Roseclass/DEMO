@@ -132,7 +132,6 @@ private:
 
 	void Glow_List(int32 PrevIdx, int32 CurIdx);
 	void Glow_Input();
-	void Save(int32 InSlotIndex);
 	void Load(int32 InSlotIndex);
 
 	void OnInput();

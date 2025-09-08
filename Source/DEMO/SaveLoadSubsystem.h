@@ -9,7 +9,6 @@
 #include "UObject/NoExportTypes.h"
 #include "UObject/WeakInterfacePtr.h"
 
-#include "SaveLoad/Save.h"
 #include "SaveLoad/SaveLoadTypes.h"
 
 #include "SaveLoadSubsystem.generated.h"
@@ -18,16 +17,15 @@
  * 
  */
 
-class ADEMOPlayerState;
-
 UCLASS()
 class DEMO_API USaveLoadSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 	//property
 private:
-	ADEMOPlayerState* PS;
 	FSaveWriteKey SaveWriteKey;
+	UPROPERTY(Transient)USaveGameMetaData* CachedMetaData;
+	UPROPERTY(Transient)USaveGameData* CachedGameData;
 protected:
 public:
 
@@ -50,6 +48,15 @@ public:
 
 	// Deletes the specified slot
 	ESaveLoadResult DeleteData(int32 InSlotIndex);
+
+	FORCEINLINE USaveGameMetaData* ReadMetaData()const { return CachedMetaData; };
+	FORCEINLINE USaveGameData* ReadGameData()const { return CachedGameData; };
+
+	FString GetCurrentSaveSlot()const;
+	const TArray<FSaveMetaData>& GetAllSaveMetaData()const;
+	int32 GetMaxSize()const;
+	bool IsEmpty(int32 InSlotIndex)const;
+	bool IsSlotNameAvailable(FString InSlotName);
 };
 
 /*

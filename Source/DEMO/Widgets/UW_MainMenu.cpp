@@ -6,7 +6,6 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 
-#include "DEMOPlayerState.h"
 #include "SaveLoadSubsystem.h"
 
 #include "Widgets/UW_MainMenu_SaveDataSelect.h"
@@ -17,8 +16,6 @@ void UUW_MainMenu::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 
-	USaveLoadSubsystem* SS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
-
 	SaveDataSelect->Init(ConfirmWidget);
 	SaveDataSelect->OnBackConfirmed.AddLambda([=]()
 		{
@@ -28,7 +25,6 @@ void UUW_MainMenu::NativeOnInitialized()
 
 	//Settings->Init(Confirm);
 
-	SS->Init();
 	ConfirmWidget->Init();
 
 	// 위젯이 키 입력을 받을 수 있도록
@@ -47,9 +43,9 @@ void UUW_MainMenu::NativeConstruct()
 	ActivatedPhaseMap.Add(EMainMenuPhase::ExitGame, 1);
 	ActivatedPhaseMap.Add(EMainMenuPhase::MAX, 1);
 
-	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 
-	if (PS->GetCurrentSaveSlot().IsEmpty())
+	if (SLS->GetCurrentSaveSlot().IsEmpty())
 	{
 		Location = EMainMenuPhase::NewGame;
 		ActivatedPhaseMap[EMainMenuPhase::Continue] = 0;
@@ -224,9 +220,9 @@ void UUW_MainMenu::ShowMainMenu()
 
 	// check Continue
 
-	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 
-	if (PS->GetCurrentSaveSlot().IsEmpty())
+	if (SLS->GetCurrentSaveSlot().IsEmpty())
 	{
 		Location = EMainMenuPhase::NewGame;
 		ActivatedPhaseMap[EMainMenuPhase::Continue] = 0;

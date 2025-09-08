@@ -22,15 +22,15 @@ public:
 	//property
 private:
 	TSet<ATPSCharacter*> CharacterSet;
-	TQueue<UTPSCharacterData*> SpawnQueue;
-	TQueue<UTPSCharacterData*> LoadQueue;
+	TArray<UTPSCharacterData*> SpawnQueue;
+	TArray<UTPSCharacterData*> LoadQueue;
 protected:
 public:
 
 	//function
 private:
 	void SpawnCharacter(UTPSCharacterData* InData, bool bLoad = 0);
-	void TrySpawnCharacter(TQueue<UTPSCharacterData*>& InQueue, bool bLoad = 0);
+	void TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad = 0);
 protected:
 public:
 	void RequestSpawnCharacter(UTPSCharacterData* InData);

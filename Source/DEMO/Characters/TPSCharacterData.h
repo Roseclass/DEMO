@@ -24,6 +24,9 @@ struct FTPSCharacterRuntimeData
 	GENERATED_BODY()
 public:
 	bool bInitComplete = 0;
+	// 서브 시스템 (레지스트리->맵)에서의 키값
+	UPROPERTY(Transient)
+		FGameplayTag DataTag;
 
 	// Action 입력시 사용할 어빌리티 태그
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
@@ -56,10 +59,6 @@ class DEMO_API UTPSCharacterData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 public:
-	// 서브 시스템 (레지스트리->맵)에서의 키값
-	UPROPERTY(Transient)
-		FGameplayTag DataTag;
-
 	// 캐릭터에 Init 때 복사할 데이터
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Runtime|Datas")
 		FTPSCharacterRuntimeData RuntimeData;

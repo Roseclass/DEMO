@@ -8,7 +8,7 @@
 #include "Components/ScrollBar.h"
 #include "Components/TextBlock.h"
 
-#include "DEMOPlayerState.h"
+#include "DEMOGameState.h"
 #include "SaveLoadSubsystem.h"
 
 #include "Widgets/UW_MainMenu_Confirm.h"
@@ -63,9 +63,8 @@ void UUW_MainMenu_SaveDataSelect::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
-
-	TArray<FSaveMetaData> metaDatas = PS->GetAllSaveMetaData();
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	TArray<FSaveMetaData> metaDatas = SLS->GetAllSaveMetaData();
 
 	for (const auto& i : metaDatas)
 	{
@@ -173,7 +172,7 @@ void UUW_MainMenu_SaveDataSelect::Right()
 void UUW_MainMenu_SaveDataSelect::Confirm()
 {
 	CheckTrue_Print(!ConfirmWidget, "ConfirmWidget is nullptr");
-	
+
 	//BACK
 	if (SlotIndex == SaveDataList->GetNumItems())
 	{
@@ -181,8 +180,7 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 		return;
 	}
 
-	ADEMOPlayerState* PS = Cast<ADEMOPlayerState>(UGameplayStatics::GetPlayerState(GetWorld(), 0));
-	USaveLoadSubsystem* SS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 
 	// ELSE
 	if (PhaseType == EMainMenuPhase::NewGame)
@@ -193,10 +191,15 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 			if (InputCursorLocation == CURSOR_CONFIRM)
 			{
 				CheckTrue_Print(!SaveSlotNames.IsValidIndex(SlotIndex), "SlotIndex is out of range");
-				SS->DeleteData(SlotIndex);
-				SS->CreateNewData(SlotIndex, SaveSlotNames[SlotIndex] = Input_TextBox->GetText().ToString());				
-				SS->LoadData(SlotIndex);
-				OffInput();
+				if(SLS->IsSlotNameAvailable(Input_TextBox->GetText().ToString()))
+				{
+					Load(SlotIndex);
+					OffInput();
+				}
+				else
+				{
+					// TODO::경고창;
+				}
 			}
 			else if (InputCursorLocation == CURSOR_CANCEL)
 			{
@@ -207,7 +210,7 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 				CheckTrue_Print(1, "InputCursorLocation is out of range");
 			}
 		}
-		else if (PS->IsEmpty(SlotIndex))
+		else if (SLS->IsEmpty(SlotIndex))
 		{
 			this->OnInput();
 		}
@@ -227,7 +230,7 @@ void UUW_MainMenu_SaveDataSelect::Confirm()
 	}
 	else if (PhaseType == EMainMenuPhase::LoadGame)
 	{
-		SS->LoadData(SlotIndex);
+		Load(SlotIndex);
 	}
 	else CheckTrue_Print(1, "Type is not Valid");
 }
@@ -253,10 +256,10 @@ void UUW_MainMenu_SaveDataSelect::Glow_List(int32 PrevIdx, int32 CurIdx)
 	if (SaveDataList->GetListItems().IsValidIndex(CurIdx))
 		SaveDataList->SetItemSelection(SaveDataList->GetItemAt(CurIdx), 1);
 
-	GetWorld()->GetTimerManager().SetTimerForNextTick([&]()
-		{
-			if (SaveDataList->GetListItems().IsValidIndex(SlotIndex))SaveDataList->SetScrollOffset(SlotIndex * 1.078125);
-		});
+	//GetWorld()->GetTimerManager().SetTimerForNextTick([&]()
+	//	{
+	//		if (SaveDataList->GetListItems().IsValidIndex(SlotIndex))SaveDataList->SetScrollOffset(SlotIndex * 1.078125);
+	//	});
 }
 
 void UUW_MainMenu_SaveDataSelect::Glow_Input()
@@ -271,18 +274,18 @@ void UUW_MainMenu_SaveDataSelect::Glow_Input()
 	Input_Cancel->SetBrushTintColor(InputCursorLocation & CURSOR_CANCEL ? selected : notSelected);
 }
 
-void UUW_MainMenu_SaveDataSelect::Save(int32 InSlotIndex)
-{
-	//UNDONE 세이브로드와 연결하기
-	CLog::Print(InSlotIndex);
-	CLog::Print("Save");
-}
-
 void UUW_MainMenu_SaveDataSelect::Load(int32 InSlotIndex)
 {
-	//UNDONE 세이브로드와 연결하기
-	CLog::Print(InSlotIndex);
-	CLog::Print("Load");
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	if (PhaseType == EMainMenuPhase::NewGame)
+	{
+		SLS->DeleteData(SlotIndex);
+		SLS->CreateNewData(SlotIndex, SaveSlotNames[SlotIndex] = Input_TextBox->GetText().ToString());
+	}
+	SLS->LoadData(SlotIndex);
+
+	ADEMOGameState* GS = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
+	GS->RequestPhaseChange(EGameStatePhase::TPS, nullptr);
 }
 
 void UUW_MainMenu_SaveDataSelect::OnInput()

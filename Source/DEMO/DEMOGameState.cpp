@@ -1,8 +1,10 @@
 #include "DEMOGameState.h"
 #include "Global.h"
 
+#include "MainMenuSubsystem.h"
 #include "TPSSubsystem.h"
 #include "TurnBasedSubsystem.h"
+#include "SaveLoadSubsystem.h"
 
 ADEMOGameState::ADEMOGameState()
 {
@@ -12,11 +14,19 @@ ADEMOGameState::ADEMOGameState()
 void ADEMOGameState::BeginPlay()
 {
 	Super::BeginPlay();
+	Init();
 }
 
-void ADEMOGameState::Tick(float DeltaTime)
+void ADEMOGameState::Init()
 {
-	Super::Tick(DeltaTime);
+	UMainMenuSubsystem* MM = GetGameInstance()->GetSubsystem<UMainMenuSubsystem>();
+	if (MM)MM->InitPhaseSystem();
+	UTPSSubsystem* TPS = GetGameInstance()->GetSubsystem<UTPSSubsystem>();
+	if (TPS)TPS->InitPhaseSystem();
+	UTurnBasedSubsystem* TBS = GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
+	if (TBS)TBS->InitPhaseSystem();
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	if (SLS)SLS->Init();
 }
 
 void ADEMOGameState::ChangePhase(EGameStatePhase NewPhase, UObject* Context)
@@ -25,7 +35,6 @@ void ADEMOGameState::ChangePhase(EGameStatePhase NewPhase, UObject* Context)
 
 	ReportFunc = [&]() 
 	{
-		CLog::Print("ReportFunc");
 		CurrentPhase = NewPhase;
 		EnterPhaseState(NewPhase, Context);
 	};
@@ -47,7 +56,6 @@ void ADEMOGameState::EnterPhaseState(EGameStatePhase NewPhase, UObject* Context)
 
 	ReportFunc = [&]()
 	{
-		CLog::Print("ReportFunc");
 		ActiveToken = FPhaseTransitionToken();
 	};
 

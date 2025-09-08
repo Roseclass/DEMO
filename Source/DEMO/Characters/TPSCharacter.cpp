@@ -12,6 +12,8 @@
 
 #include "Objects/EventTrigger.h"
 
+#include "SaveLoad/SaveLoadTypes.h"
+
 ATPSCharacter::ATPSCharacter()
 {
 	// Configure character movement
@@ -25,6 +27,9 @@ ATPSCharacter::ATPSCharacter()
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
+
+	GetMesh()->SetRelativeLocation(FVector(0, 0, -97));
+	GetMesh()->SetRelativeRotation(FQuat(FRotator3d(0, -90, 0)));
 }
 void ATPSCharacter::BeginPlay()
 {
@@ -34,6 +39,8 @@ void ATPSCharacter::BeginPlay()
 void ATPSCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	CLog::Print(GetName(), -1, 0);
 }
 
 void ATPSCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -63,7 +70,22 @@ void ATPSCharacter::OnBeforeSave(USaveGameData* SaveData)
 
 void ATPSCharacter::OnAfterLoad(USaveGameData* ReadData)
 {
-	//TODO
+	FSaveData* data = nullptr;
+
+	for(auto& i : ReadData->SavedPlayerDatas)
+		if (i.DATag == RuntimeData.DataTag)
+		{
+			data = &i;
+			break;
+		}
+	if(data)SetActorTransform(data->Transform);
+	for (auto& i : ReadData->SavedEnemyDatas)
+		if (i.DATag == RuntimeData.DataTag)
+		{
+			data = &i;
+			break;
+		}
+	if(data)SetActorTransform(data->Transform);
 }
 
 AEventTrigger* ATPSCharacter::GetEventTrigger()
