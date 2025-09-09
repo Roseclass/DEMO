@@ -8,7 +8,7 @@
 #include "Components/ScrollBar.h"
 #include "Components/TextBlock.h"
 
-#include "DEMOGameState.h"
+#include "DEMOGameInstance.h"
 #include "SaveLoadSubsystem.h"
 
 #include "Widgets/UW_MainMenu_Confirm.h"
@@ -284,8 +284,8 @@ void UUW_MainMenu_SaveDataSelect::Load(int32 InSlotIndex)
 	}
 	SLS->LoadData(SlotIndex);
 
-	ADEMOGameState* GS = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
-	GS->RequestPhaseChange(EGameStatePhase::TPS, nullptr);
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->RequestPhaseChange(EGameInstancePhase::TPS, nullptr);
 }
 
 void UUW_MainMenu_SaveDataSelect::OnInput()

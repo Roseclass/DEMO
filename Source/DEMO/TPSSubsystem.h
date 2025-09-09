@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "Datas/GameStateTypes.h"
+#include "Datas/GameInstanceTypes.h"
 #include "Datas/TPSDataTypes.h"
 #include "TPSSubsystem.generated.h"
 
@@ -35,10 +35,10 @@ public:
 
 	//function
 private:
+	void InitializeTPSField();
 	UFUNCTION()void EnterTPS(FPhaseTransitionToken InToken, UObject* Context);
 	UFUNCTION()void ExitTPS(FPhaseTransitionToken InToken);
 protected:
 public:
-	void InitializeTPSField();
 	void InitPhaseSystem();
 };

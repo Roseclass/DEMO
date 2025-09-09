@@ -39,6 +39,16 @@ void ATPSPhaseManager::SpawnCharacter(UTPSCharacterData* InData, bool bLoad)
 	}
 }
 
+void ATPSPhaseManager::InitPlayerCharacter(UTPSCharacterData* InData)
+{
+	ATPSCharacter* ch = Cast<ATPSCharacter>(UGameplayStatics::GetPlayerControllerFromID(GetWorld(), 0)->GetPawn());
+	ch->Init(InData);
+
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	USaveGameData* data = SLS->ReadGameData();
+	ch->OnAfterLoad(data);
+}
+
 void ATPSPhaseManager::TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad)
 {
 	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
@@ -48,17 +58,16 @@ void ATPSPhaseManager::TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bo
 	{
 		UTPSCharacterData* top = InQueue[0];
 		InQueue.RemoveAt(0);
-		for (auto i : data->SavedPlayerDatas)
+		for (int32 i = 0; i < data->SavedPlayerDatas.Num();i++)
 		{
-			if (i.DATag != top->RuntimeData.DataTag)continue;
+			if (data->SavedPlayerDatas[i].DATag != top->RuntimeData.DataTag)continue;
 			SpawnCharacter(top, bLoad);
 			top = nullptr;
 		}
 		if (!top)continue;
-
-		for (auto i : data->SavedEnemyDatas)
+		for (int32 i = 0; i < data->SavedEnemyDatas.Num();i++)
 		{
-			if (i.DATag != top->RuntimeData.DataTag)continue;
+			if (data->SavedEnemyDatas[i].DATag != top->RuntimeData.DataTag)continue;
 			SpawnCharacter(top, bLoad);
 		}
 	}

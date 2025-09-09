@@ -5,10 +5,12 @@
 
 #include "GameFramework/CharacterMovementComponent.h"
 
-#include "DEMOGameState.h"
+#include "DEMOGameInstance.h"
 
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
+
+#include "Datas/GameInstanceTypes.h"
 
 #include "Objects/EventTrigger.h"
 
@@ -39,8 +41,6 @@ void ATPSCharacter::BeginPlay()
 void ATPSCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	CLog::Print(GetName(), -1, 0);
 }
 
 void ATPSCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -78,14 +78,17 @@ void ATPSCharacter::OnAfterLoad(USaveGameData* ReadData)
 			data = &i;
 			break;
 		}
-	if(data)SetActorTransform(data->Transform);
-	for (auto& i : ReadData->SavedEnemyDatas)
+
+	for(auto& i : ReadData->SavedEnemyDatas)
 		if (i.DATag == RuntimeData.DataTag)
 		{
 			data = &i;
 			break;
 		}
-	if(data)SetActorTransform(data->Transform);
+
+	CheckNull(data);
+	TeamID = data->TeamID;
+	SetActorTransform(data->Transform);
 }
 
 AEventTrigger* ATPSCharacter::GetEventTrigger()
@@ -164,8 +167,13 @@ void ATPSCharacter::Init(UPrimaryDataAsset* DA)
 			//	));
 			//Ability->HandleGameplayEvent(EventTag, Payload);
 
-			ADEMOGameState* gs = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
-			gs->RequestPhaseChange(EGameStatePhase::TurnBased, nullptr);
+			UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
+			context->Causer = EventTrigger;
+			context->Instigator = this;
+			context->Target = Cast<ABaseCharacter>(Payload->Target);
+
+			UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+			gi->RequestPhaseChange(EGameInstancePhase::TurnBased, context);
 		});
 	EventTrigger->OnEndOverlap;
 	UGameplayStatics::FinishSpawningActor(EventTrigger, FTransform());
@@ -173,9 +181,14 @@ void ATPSCharacter::Init(UPrimaryDataAsset* DA)
 	if (USceneComponent* Root = EventTrigger->GetRootComponent())
 		Root->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	EventTrigger->SetOwner(this);
+}
 
+FGameplayTag ATPSCharacter::GetDataTag() const
+{
+	return RuntimeData.DataTag;
+}
 
-	/*
-	* TODO softptr asset init
-	*/
+TArray<FGameplayTag> ATPSCharacter::GetDataTags() const
+{
+	return RuntimeData.TurnBasedDataTags;
 }

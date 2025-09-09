@@ -84,3 +84,12 @@ void ABaseCharacter::Init(UPrimaryDataAsset* DA)
 {
 
 }
+
+FGameplayTag ABaseCharacter::GetDataTag() const
+{
+	return FGameplayTag();
+}
+TArray<FGameplayTag> ABaseCharacter::GetDataTags() const
+{
+	return TArray<FGameplayTag>();
+}

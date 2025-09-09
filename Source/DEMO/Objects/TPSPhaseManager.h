@@ -33,6 +33,7 @@ private:
 	void TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad = 0);
 protected:
 public:
+	void InitPlayerCharacter(UTPSCharacterData* InData);
 	void RequestSpawnCharacter(UTPSCharacterData* InData);
 	void RequestLoadCharacter(UTPSCharacterData* InData);
 };

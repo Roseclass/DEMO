@@ -4,13 +4,13 @@
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
 #include "GameAbilities/AbilityTypes.h"
-#include "TPSCharacterData.generated.h"
+#include "TurnBasedCharacterData.generated.h"
 
 /**
  *
  */
 
-//#include "Characters/TPSCharacterData.h"
+//#include "Characters/TurnBasedCharacterData.h"
 
 class UAnimInstance;
 class USkeletalMesh;
@@ -19,7 +19,7 @@ class UGA_BaseAbility;
 class AEventTrigger;
 
 USTRUCT(BlueprintType)
-struct FTPSCharacterRuntimeData
+struct FTurnBasedCharacterRuntimeData
 {
 	GENERATED_BODY()
 public:
@@ -52,19 +52,16 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
 		FName ActionOnEndOverlapLeaf = "OnEndOverlap";
 
-	// 턴제전투에서 스폰될 캐릭터 데이터 태그
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "TurnBased")
-		TArray<FGameplayTag> TurnBasedDataTags;
 };
 
 UCLASS(BlueprintType)
-class DEMO_API UTPSCharacterData : public UPrimaryDataAsset
+class DEMO_API UTurnBasedCharacterData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 public:
 	// 캐릭터에 Init 때 복사할 데이터
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Runtime|Datas")
-		FTPSCharacterRuntimeData RuntimeData;
+		FTurnBasedCharacterRuntimeData RuntimeData;
 
 	// 시작 시 부여할 태그(예: State.Combat.Ready 등)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
@@ -77,14 +74,6 @@ public:
 	// 시작 시 적용할 GE(버프/기본 스탯)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
 		TArray<TSubclassOf<UGameplayEffect>> StartupEffects;
-
-	// Action시 충돌을 감지할 Trigger
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|Action")
-		TSubclassOf<AEventTrigger> ActionTrigger;
-
-	// Trigger를 Attach할 SocketName
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|Action")
-		FName ActionSocketName = "Action";
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
 		TSoftObjectPtr<USkeletalMesh> SkeletalMesh;

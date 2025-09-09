@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "Characters/BaseCharacter.h"
-#include "GameplayTagContainer.h"
 #include "Characters/EventTriggerProvider.h"
 #include "Characters/TPSCharacterData.h"
 #include "TPSCharacter.generated.h"
@@ -57,4 +56,6 @@ protected:
 	void MoveRight(float Value);
 public:
 	virtual void Init(UPrimaryDataAsset* DA) override;
+	virtual FGameplayTag GetDataTag() const override;
+	virtual TArray<FGameplayTag> GetDataTags() const override;
 };

@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
-#include "Datas/GameStateTypes.h"
+#include "Datas/GameInstanceTypes.h"
 #include "MainMenuSubsystem.generated.h"
 
 /**

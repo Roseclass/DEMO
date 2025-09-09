@@ -8,3 +8,6 @@
 
 #define CheckFalse(p) { if (p == false) return; }
 #define CheckFalseResult(p) { if (p == false) return result; }
+
+#define TEAMID_PLAYER 0
+#define TEAMID_ENEMY 1

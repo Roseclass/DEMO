@@ -2,7 +2,7 @@
 #include "Global.h"
 
 #include "DEMOAssetManager.h"
-#include "DEMOGameState.h"
+#include "DEMOGameInstance.h"
 #include "SaveLoadSubsystem.h"
 
 #include "Objects/TPSPhaseManager.h"
@@ -33,7 +33,27 @@ void UTPSSubsystem::InitializeTPSField()
 	UGameplayStatics::FinishSpawningActor(Manager, FTransform());
 	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 	USaveGameData* data = SLS->ReadGameData();
-	for (auto i : data->SavedPlayerDatas)
+	
+	//UNDONE:: 플레이어 스왑 가능한 메시들 어떻게 추가할건지?
+	{
+		FGameplayTag tag = data->SavedPlayerDatas[0].DATag;
+		TArray<FSoftObjectPath> ptrArr;
+		ptrArr.Add(Registry->CharacterDAMap[tag]->SkeletalMesh.ToSoftObjectPath());
+		ptrArr.Add(Registry->CharacterDAMap[tag]->AnimBlueprint.ToSoftObjectPath());
+
+		TFunction<void()> bind = [this, tag]()
+		{
+			if (!Manager)
+			{
+				CLog::Print("???");
+				return;
+			}
+			Manager->InitPlayerCharacter(Registry->CharacterDAMap[tag]);
+		};
+		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
+	}
+
+	for (auto i : data->SavedEnemyDatas)
 	{
 		if (!Registry->CharacterDAMap.Contains(i.DATag))
 		{
@@ -67,7 +87,7 @@ void UTPSSubsystem::EnterTPS(FPhaseTransitionToken InToken, UObject* Context)
 {
 	ActiveToken = InToken;	
 	//메인메뉴->TPS
-	if (ActiveToken.CurrentPhase == EGameStatePhase::MainMenu)
+	if (ActiveToken.CurrentPhase == EGameInstancePhase::MainMenu)
 	{
 		UGameplayStatics::OpenLevel(GetWorld(), FName(TEXT("DEMO")));
 		LoadMapDelegateHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddLambda([this](UWorld* World)
@@ -77,13 +97,13 @@ void UTPSSubsystem::EnterTPS(FPhaseTransitionToken InToken, UObject* Context)
 		);
 	}
 	//턴제->TPS
-	else if (ActiveToken.CurrentPhase == EGameStatePhase::TurnBased)
+	else if (ActiveToken.CurrentPhase == EGameInstancePhase::TurnBased)
 	{
 		// enemy ai 다시 작동, tps 인풋 활성화
 	}
 
-	ADEMOGameState* gs = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
-	gs->ReportPhaseProgress(ActiveToken);
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->ReportPhaseProgress(ActiveToken);
 }
 
 void UTPSSubsystem::ExitTPS(FPhaseTransitionToken InToken)
@@ -91,25 +111,25 @@ void UTPSSubsystem::ExitTPS(FPhaseTransitionToken InToken)
 	ActiveToken = InToken;
 
 	//TPS->메인메뉴
-	if (ActiveToken.NextPhase == EGameStatePhase::MainMenu)
+	if (ActiveToken.NextPhase == EGameInstancePhase::MainMenu)
 	{
 		// 딱히할게없는데?
 	}
-	else if (ActiveToken.NextPhase == EGameStatePhase::TurnBased)
+	else if (ActiveToken.NextPhase == EGameInstancePhase::TurnBased)
 	{
 		// 저장은 어디서?
 		// enemy ai 멈추기, tps 인풋 멈추기
 	}
 
-	ADEMOGameState* gs = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
-	gs->ReportPhaseProgress(ActiveToken);
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->ReportPhaseProgress(ActiveToken);
 }
 
 void UTPSSubsystem::InitPhaseSystem()
 {
 	CheckTrue(bInitPhaseSystem);
 	bInitPhaseSystem = 1;
-	ADEMOGameState* gs = Cast<ADEMOGameState>(UGameplayStatics::GetGameState(GetWorld()));
-	gs->OnPhaseEnter[int32(EGameStatePhase::TPS)].AddUFunction(this, "EnterTPS");
-	gs->OnPhaseExit[int32(EGameStatePhase::TPS)].AddUFunction(this, "ExitTPS");
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->OnPhaseEnter[int32(EGameInstancePhase::TPS)].AddUFunction(this, "EnterTPS");
+	gi->OnPhaseExit[int32(EGameInstancePhase::TPS)].AddUFunction(this, "ExitTPS");
 }

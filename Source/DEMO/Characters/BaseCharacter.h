@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "GameplayTagContainer.h"
 #include "GenericTeamAgentInterface.h"
 #include "AbilitySystemInterface.h"
 #include "SaveLoad/Save.h"
@@ -68,6 +69,8 @@ private:
 protected:
 public:
 	virtual void Init(UPrimaryDataAsset* DA);
+	virtual FGameplayTag GetDataTag() const;
+	virtual TArray<FGameplayTag> GetDataTags() const;
 
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }

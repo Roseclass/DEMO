@@ -12,10 +12,16 @@ USaveGameData* USaveLoadSubsystem::CreateDefaultSaveData()
 	saveGameData->SavedPlayerDatas;
 	saveGameData->SavedPlayerDatas.Add(FSaveData());
 	saveGameData->SavedPlayerDatas[0].DATag = FGameplayTag::RequestGameplayTag("Data.Terra");
-	saveGameData->SavedPlayerDatas[0].Transform.SetTranslation(FVector(1400, 1120, 96));
-	saveGameData->SavedPlayerDatas[0].Transform.SetRotation(FQuat4d(FRotator(0, 180, 0)));
+	saveGameData->SavedPlayerDatas[0].TeamID = TEAMID_PLAYER;
+	saveGameData->SavedPlayerDatas[0].Transform.SetTranslation(FVector(900, 1120, 96));
+	saveGameData->SavedPlayerDatas[0].Transform.SetRotation(FQuat4d(FRotator(0, 0, 0)));
 	
 	saveGameData->SavedEnemyDatas;
+	saveGameData->SavedEnemyDatas.Add(FSaveData());
+	saveGameData->SavedEnemyDatas[0].DATag = FGameplayTag::RequestGameplayTag("Data.Morigesh");
+	saveGameData->SavedEnemyDatas[0].TeamID = TEAMID_ENEMY;
+	saveGameData->SavedEnemyDatas[0].Transform.SetTranslation(FVector(1400, 1120, 96));
+	saveGameData->SavedEnemyDatas[0].Transform.SetRotation(FQuat4d(FRotator(0, 180, 0)));
 
 	return saveGameData;
 }

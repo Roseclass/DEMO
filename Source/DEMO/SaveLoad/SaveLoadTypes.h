@@ -71,9 +71,13 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 		FGameplayTag DATag;
 
-	// character setting DA
+	// 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 		FTransform Transform;
+
+	// 
+	UPROPERTY(VisibleAnywhere, Category = "Default")
+		uint8 TeamID;
 };
 
 UCLASS()
