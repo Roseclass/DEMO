@@ -28,7 +28,7 @@ void ATurnBasedPhaseManager::SpawnCharacter(uint8 TeamID, UTurnBasedCharacterDat
 	CheckNull(InData);
 	ATurnBasedCharacter* ch = GetWorld()->SpawnActorDeferred<ATurnBasedCharacter>(ATurnBasedCharacter::StaticClass(), FTransform());
 	UGameplayStatics::FinishSpawningActor(ch, FTransform());
-	ch->Init(InData);
+	ch->Init(FGuid(), InData);
 	SpawnedCharacterMap.FindOrAdd(TeamID).Add(ch);
 }
 

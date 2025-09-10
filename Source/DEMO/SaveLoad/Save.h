@@ -22,7 +22,7 @@ class DEMO_API ISave
 
 public:
 	// Get a unique name to use when saving
-	virtual	FString GetUniqueSaveName() = 0;
+	virtual	FGuid GetUniqueSaveName() const = 0;
 
 	// Called right before the owning actor is saved
 	virtual	void OnBeforeSave(USaveGameData* SaveData) = 0;

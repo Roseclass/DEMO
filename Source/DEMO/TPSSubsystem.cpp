@@ -36,43 +36,46 @@ void UTPSSubsystem::InitializeTPSField()
 	
 	//UNDONE:: 플레이어 스왑 가능한 메시들 어떻게 추가할건지?
 	{
-		FGameplayTag tag = data->SavedPlayerDatas[0].DATag;
+		FGameplayTag tag = data->SavedPlayerDatas.begin()->Value.DATag;
+		FGuid saveName = data->SavedPlayerDatas.begin()->Key;
 		TArray<FSoftObjectPath> ptrArr;
 		ptrArr.Add(Registry->CharacterDAMap[tag]->SkeletalMesh.ToSoftObjectPath());
 		ptrArr.Add(Registry->CharacterDAMap[tag]->AnimBlueprint.ToSoftObjectPath());
 
-		TFunction<void()> bind = [this, tag]()
+		TFunction<void()> bind = [this, saveName, tag]()
 		{
 			if (!Manager)
 			{
 				CLog::Print("???");
 				return;
 			}
-			Manager->InitPlayerCharacter(Registry->CharacterDAMap[tag]);
+			Manager->InitPlayerCharacter(saveName, Registry->CharacterDAMap[tag]);
 		};
 		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
 	}
 
 	for (auto i : data->SavedEnemyDatas)
 	{
-		if (!Registry->CharacterDAMap.Contains(i.DATag))
+		FGameplayTag tag = i.Value.DATag;
+		FGuid saveName = i.Key;
+		if (!Registry->CharacterDAMap.Contains(tag))
 		{
-			CLog::Print(__FUNCTION__ + i.DATag.ToString() + "asset not contains in subsystem");
+			CLog::Print(__FUNCTION__ + tag.ToString() + "asset not contains in subsystem");
 			continue;
 		}
 
 		TArray<FSoftObjectPath> ptrArr;
-		ptrArr.Add(Registry->CharacterDAMap[i.DATag]->SkeletalMesh.ToSoftObjectPath());
-		ptrArr.Add(Registry->CharacterDAMap[i.DATag]->AnimBlueprint.ToSoftObjectPath());
+		ptrArr.Add(Registry->CharacterDAMap[tag]->SkeletalMesh.ToSoftObjectPath());
+		ptrArr.Add(Registry->CharacterDAMap[tag]->AnimBlueprint.ToSoftObjectPath());
 
-		TFunction<void()> bind = [this, i]()
+		TFunction<void()> bind = [this, saveName, tag]()
 		{
 			if (!Manager)
 			{
 				CLog::Print("???");
 				return;
 			}
-			Manager->RequestLoadCharacter(Registry->CharacterDAMap[i.DATag]);
+			Manager->RequestLoadCharacter(saveName, Registry->CharacterDAMap[tag]);
 		};
 		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
 	}

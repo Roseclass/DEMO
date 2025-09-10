@@ -22,18 +22,17 @@ public:
 	//property
 private:
 	TSet<ATPSCharacter*> CharacterSet;
-	TArray<UTPSCharacterData*> SpawnQueue;
-	TArray<UTPSCharacterData*> LoadQueue;
+	TArray<TTuple<FGuid, UTPSCharacterData*>> SpawnQueue;
 protected:
 public:
 
 	//function
 private:
-	void SpawnCharacter(UTPSCharacterData* InData, bool bLoad = 0);
-	void TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad = 0);
+	void SpawnCharacter(FGuid InSaveName, UTPSCharacterData* InData);
+	void TrySpawnCharacter();
 protected:
 public:
-	void InitPlayerCharacter(UTPSCharacterData* InData);
+	void InitPlayerCharacter(FGuid InSaveName, UTPSCharacterData* InData);
+	void RequestLoadCharacter(FGuid InSaveName, UTPSCharacterData* InData);
 	void RequestSpawnCharacter(UTPSCharacterData* InData);
-	void RequestLoadCharacter(UTPSCharacterData* InData);
 };

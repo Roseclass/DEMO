@@ -41,6 +41,9 @@ void ATPSCharacter::BeginPlay()
 void ATPSCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	if(GetUniqueSaveName().IsValid())
+		CLog::Print(GetUniqueSaveName().ToString(), -1, 0);
 }
 
 void ATPSCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -58,11 +61,6 @@ void ATPSCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
 }
 
-FString ATPSCharacter::GetUniqueSaveName()
-{
-	return FString();
-}
-
 void ATPSCharacter::OnBeforeSave(USaveGameData* SaveData)
 {
 	GetUniqueSaveName();
@@ -70,21 +68,22 @@ void ATPSCharacter::OnBeforeSave(USaveGameData* SaveData)
 
 void ATPSCharacter::OnAfterLoad(USaveGameData* ReadData)
 {
+	FGuid saveName = GetUniqueSaveName();
+	if (!saveName.IsValid())
+	{
+		CLog::Print(GetName() + "saveName not valid");
+		return;
+	}
 	FSaveData* data = nullptr;
 
-	for(auto& i : ReadData->SavedPlayerDatas)
-		if (i.DATag == RuntimeData.DataTag)
-		{
-			data = &i;
-			break;
-		}
-
-	for(auto& i : ReadData->SavedEnemyDatas)
-		if (i.DATag == RuntimeData.DataTag)
-		{
-			data = &i;
-			break;
-		}
+	if (ReadData->SavedPlayerDatas.Contains(GetUniqueSaveName()))
+	{
+		data = &ReadData->SavedPlayerDatas[saveName];
+	}
+	else if (ReadData->SavedEnemyDatas.Contains(GetUniqueSaveName()))
+	{
+		data = &ReadData->SavedEnemyDatas[saveName];
+	}
 
 	CheckNull(data);
 	TeamID = data->TeamID;
@@ -138,9 +137,9 @@ void ATPSCharacter::MoveRight(float Value)
 	}
 }
 
-void ATPSCharacter::Init(UPrimaryDataAsset* DA)
+void ATPSCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 {
-	Super::Init(DA);
+	Super::Init(NewSaveName, DA);
 
 	UTPSCharacterData* tpsData = Cast<UTPSCharacterData>(DA);
 	CheckTrue_Print(!tpsData, "tpsData cast Fail!!");

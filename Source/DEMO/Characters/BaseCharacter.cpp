@@ -65,9 +65,9 @@ UAbilitySystemComponent* ABaseCharacter::GetAbilitySystemComponent() const
 	return Ability;
 }
 
-FString ABaseCharacter::GetUniqueSaveName()
+FGuid ABaseCharacter::GetUniqueSaveName() const
 {
-	return FString();
+	return UniqueSaveName;
 }
 
 void ABaseCharacter::OnBeforeSave(USaveGameData* SaveData)
@@ -80,9 +80,9 @@ void ABaseCharacter::OnAfterLoad(USaveGameData* ReadData)
 
 }
 
-void ABaseCharacter::Init(UPrimaryDataAsset* DA)
+void ABaseCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 {
-
+	UniqueSaveName = NewSaveName;
 }
 
 FGameplayTag ABaseCharacter::GetDataTag() const

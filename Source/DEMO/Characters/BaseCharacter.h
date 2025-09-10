@@ -35,13 +35,14 @@ public:
 	// End of IAbilitySystemInterface interface
 
 	// ISave interface
-	virtual	FString GetUniqueSaveName() override;
+	virtual	FGuid GetUniqueSaveName() const final override;
 	virtual	void OnBeforeSave(USaveGameData* SaveData) override;
 	virtual	void OnAfterLoad(USaveGameData* ReadData) override;
 	// End of ISave interface
 
 	//property
 private:
+	FGuid UniqueSaveName;
 protected:
 	//scene
 
@@ -68,7 +69,7 @@ public:
 private:
 protected:
 public:
-	virtual void Init(UPrimaryDataAsset* DA);
+	virtual void Init(FGuid NewSaveName,UPrimaryDataAsset* DA);
 	virtual FGameplayTag GetDataTag() const;
 	virtual TArray<FGameplayTag> GetDataTags() const;
 

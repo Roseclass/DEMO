@@ -25,11 +25,6 @@ void ATurnBasedCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-FString ATurnBasedCharacter::GetUniqueSaveName()
-{
-	return FString();
-}
-
 void ATurnBasedCharacter::OnBeforeSave(USaveGameData* SaveData)
 {
 

@@ -19,66 +19,60 @@ void ATPSPhaseManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!SpawnQueue.IsEmpty())TrySpawnCharacter(SpawnQueue);
-	if (!LoadQueue.IsEmpty())TrySpawnCharacter(LoadQueue, 1);
+	if (!SpawnQueue.IsEmpty())TrySpawnCharacter();
 }
 
-void ATPSPhaseManager::SpawnCharacter(UTPSCharacterData* InData, bool bLoad)
+void ATPSPhaseManager::SpawnCharacter(FGuid InSaveName, UTPSCharacterData* InData)
 {
 	CheckNull(InData);
 	ATPSCharacter* ch = GetWorld()->SpawnActorDeferred<ATPSCharacter>(ATPSCharacter::StaticClass(), FTransform());
 	UGameplayStatics::FinishSpawningActor(ch, FTransform());
-	ch->Init(InData);
+	ch->Init(InSaveName, InData);
 	CharacterSet.Add(ch);
 
-	if (bLoad)
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	USaveGameData* data = SLS->ReadGameData();
+	if (data->SavedPlayerDatas.Contains(InSaveName) ||
+		data->SavedEnemyDatas.Contains(InSaveName))
 	{
-		USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
-		USaveGameData* data = SLS->ReadGameData();
 		ch->OnAfterLoad(data);
 	}
 }
 
-void ATPSPhaseManager::InitPlayerCharacter(UTPSCharacterData* InData)
+void ATPSPhaseManager::TrySpawnCharacter()
 {
-	ATPSCharacter* ch = Cast<ATPSCharacter>(UGameplayStatics::GetPlayerControllerFromID(GetWorld(), 0)->GetPawn());
-	ch->Init(InData);
-
 	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
-	USaveGameData* data = SLS->ReadGameData();
-	ch->OnAfterLoad(data);
+	USaveGameData* saveData = SLS->ReadGameData();
+
+	while (!SpawnQueue.IsEmpty())
+	{
+		FGuid name = SpawnQueue[0].Key;
+		UTPSCharacterData* data = SpawnQueue[0].Value;
+		SpawnQueue.RemoveAt(0);
+		SpawnCharacter(name, data);
+	}
 }
 
-void ATPSPhaseManager::TrySpawnCharacter(TArray<UTPSCharacterData*>& InQueue, bool bLoad)
+void ATPSPhaseManager::InitPlayerCharacter(FGuid InSaveName, UTPSCharacterData* InData)
 {
+	ATPSCharacter* ch = Cast<ATPSCharacter>(UGameplayStatics::GetPlayerControllerFromID(GetWorld(), 0)->GetPawn());
+	ch->Init(InSaveName, InData);
+
 	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 	USaveGameData* data = SLS->ReadGameData();
-
-	while (!InQueue.IsEmpty())
+	if (data->SavedPlayerDatas.Contains(InSaveName) ||
+		data->SavedEnemyDatas.Contains(InSaveName))
 	{
-		UTPSCharacterData* top = InQueue[0];
-		InQueue.RemoveAt(0);
-		for (int32 i = 0; i < data->SavedPlayerDatas.Num();i++)
-		{
-			if (data->SavedPlayerDatas[i].DATag != top->RuntimeData.DataTag)continue;
-			SpawnCharacter(top, bLoad);
-			top = nullptr;
-		}
-		if (!top)continue;
-		for (int32 i = 0; i < data->SavedEnemyDatas.Num();i++)
-		{
-			if (data->SavedEnemyDatas[i].DATag != top->RuntimeData.DataTag)continue;
-			SpawnCharacter(top, bLoad);
-		}
+		ch->OnAfterLoad(data);
 	}
+}
+
+void ATPSPhaseManager::RequestLoadCharacter(FGuid InSaveName, UTPSCharacterData* InData)
+{
+	SpawnQueue.Add({ InSaveName,InData });
 }
 
 void ATPSPhaseManager::RequestSpawnCharacter(UTPSCharacterData* InData)
 {
-	SpawnQueue.Add(InData);
-}
-
-void ATPSPhaseManager::RequestLoadCharacter(UTPSCharacterData* InData)
-{
-	LoadQueue.Add(InData);
+	SpawnQueue.Add({ FGuid(),InData });
 }

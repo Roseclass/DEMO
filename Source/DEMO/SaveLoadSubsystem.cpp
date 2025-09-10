@@ -5,27 +5,6 @@
 
 static const FString kMetadataSaveSlot = "SaveGameMetadata";
 
-USaveGameData* USaveLoadSubsystem::CreateDefaultSaveData()
-{
-	USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
-
-	saveGameData->SavedPlayerDatas;
-	saveGameData->SavedPlayerDatas.Add(FSaveData());
-	saveGameData->SavedPlayerDatas[0].DATag = FGameplayTag::RequestGameplayTag("Data.Terra");
-	saveGameData->SavedPlayerDatas[0].TeamID = TEAMID_PLAYER;
-	saveGameData->SavedPlayerDatas[0].Transform.SetTranslation(FVector(900, 1120, 96));
-	saveGameData->SavedPlayerDatas[0].Transform.SetRotation(FQuat4d(FRotator(0, 0, 0)));
-	
-	saveGameData->SavedEnemyDatas;
-	saveGameData->SavedEnemyDatas.Add(FSaveData());
-	saveGameData->SavedEnemyDatas[0].DATag = FGameplayTag::RequestGameplayTag("Data.Morigesh");
-	saveGameData->SavedEnemyDatas[0].TeamID = TEAMID_ENEMY;
-	saveGameData->SavedEnemyDatas[0].Transform.SetTranslation(FVector(1400, 1120, 96));
-	saveGameData->SavedEnemyDatas[0].Transform.SetRotation(FQuat4d(FRotator(0, 180, 0)));
-
-	return saveGameData;
-}
-
 void USaveLoadSubsystem::Init()
 {
 	SaveWriteKey = FSaveWriteKey();
@@ -88,7 +67,7 @@ ESaveLoadResult USaveLoadSubsystem::CreateNewData(int32 InSlotIndex, FString InS
 
 	// Create a new save game data instace
 	// save the game to the InSlotName slot
-	if (!UGameplayStatics::SaveGameToSlot(CreateDefaultSaveData(), InSlotName, 0))
+	if (!UGameplayStatics::SaveGameToSlot(USaveGameData::CreateDefaultSaveData(), InSlotName, 0))
 		return ESaveLoadResult::Failure_Game;
 
 	// update the metadata file with the new slot

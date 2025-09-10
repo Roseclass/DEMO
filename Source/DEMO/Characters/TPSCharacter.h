@@ -27,7 +27,6 @@ public:
 	// End of APawn interface
 
 	// ISave interface
-	virtual	FString GetUniqueSaveName() override;
 	virtual	void OnBeforeSave(USaveGameData* SaveData) override;
 	virtual	void OnAfterLoad(USaveGameData* ReadData) override;
 	// End of ISave interface
@@ -55,7 +54,7 @@ protected:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 public:
-	virtual void Init(UPrimaryDataAsset* DA) override;
-	virtual FGameplayTag GetDataTag() const override;
+	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
+	virtual FGameplayTag GetDataTag() const ;
 	virtual TArray<FGameplayTag> GetDataTags() const override;
 };

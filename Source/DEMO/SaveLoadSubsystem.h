@@ -31,7 +31,6 @@ public:
 
 	//function
 private:
-	USaveGameData* CreateDefaultSaveData();
 protected:
 public:
 	// initialize the calss. mustbe called when the first launches

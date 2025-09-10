@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "GameplayTagContainer.h"
+#include "Global.h"
 #include "SaveLoadTypes.generated.h"
 
 /**
@@ -85,9 +86,31 @@ class DEMO_API USaveGameData : public USaveGame
 {
 	GENERATED_BODY()
 public:
+	static USaveGameData* CreateDefaultSaveData()
+	{
+		USaveGameData* saveGameData = Cast<USaveGameData>(UGameplayStatics::CreateSaveGameObject(USaveGameData::StaticClass()));
+		FGuid key = FGuid::NewGuid();
+		saveGameData->SavedPlayerDatas;
+		saveGameData->SavedPlayerDatas.Add(key, FSaveData());
+		saveGameData->SavedPlayerDatas[key].DATag = FGameplayTag::RequestGameplayTag("Data.Terra");
+		saveGameData->SavedPlayerDatas[key].TeamID = TEAMID_PLAYER;
+		saveGameData->SavedPlayerDatas[key].Transform.SetTranslation(FVector(900, 1120, 96));
+		saveGameData->SavedPlayerDatas[key].Transform.SetRotation(FQuat4d(FRotator(0, 0, 0)));
+
+		key = FGuid::NewGuid();
+		saveGameData->SavedEnemyDatas;
+		saveGameData->SavedEnemyDatas.Add(key, FSaveData());
+		saveGameData->SavedEnemyDatas[key].DATag = FGameplayTag::RequestGameplayTag("Data.Morigesh");
+		saveGameData->SavedEnemyDatas[key].TeamID = TEAMID_ENEMY;
+		saveGameData->SavedEnemyDatas[key].Transform.SetTranslation(FVector(1400, 1120, 96));
+		saveGameData->SavedEnemyDatas[key].Transform.SetRotation(FQuat4d(FRotator(0, 180, 0)));
+
+		return saveGameData;
+	}
+public:
 	UPROPERTY(VisibleAnywhere, Category = "Default")
-		TArray<FSaveData> SavedPlayerDatas;
+		TMap<FGuid, FSaveData> SavedPlayerDatas;
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
-		TArray<FSaveData> SavedEnemyDatas;
+		TMap<FGuid, FSaveData> SavedEnemyDatas;
 };
