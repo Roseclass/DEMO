@@ -27,7 +27,7 @@ public:
 private:
 	ATurnBasedPhaseManager* Manager;
 	bool bInitPhaseSystem;
-	UPhaseTransitionContext* TempContext;
+	UPROPERTY()UPhaseTransitionContext* TempContext;
 	FPhaseTransitionToken ActiveToken;
 	TMap<ETurnBasedFieldId, FTurnBasedFieldLayoutRow*> LevelDatas;
 protected:

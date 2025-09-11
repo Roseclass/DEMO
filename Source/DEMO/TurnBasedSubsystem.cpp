@@ -31,7 +31,7 @@ void UTurnBasedSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		Registry->LevelDT->GetAllRows<FTurnBasedFieldLayoutRow>("", datas);
 		for (auto i : datas)
-			LevelDatas[i->FieldId] = i;
+			LevelDatas.FindOrAdd(i->FieldId) = i;
 	}
 }
 
@@ -42,10 +42,11 @@ void UTurnBasedSubsystem::InitializeTurnBasedField()
 
 	// 위치에 맞게 액터 스폰
 	// 이건 월드 서브시스템이나 월드에 배치해둔 콜리전으로 현재 어느 섹션인지 따로 저장해놨다가 받아오자
-	LevelDatas;
 
 	Manager = GetWorld()->SpawnActorDeferred<ATurnBasedPhaseManager>(ATurnBasedPhaseManager::StaticClass(), FTransform());
 	UGameplayStatics::FinishSpawningActor(Manager, FTransform());
+	//UNDONE 나중에 섹션 감지 추가하면 수정해야됨
+	Manager->SetLevelData(LevelDatas[ETurnBasedFieldId::TEST]);
 
 	Manager->AddToSpawnMap(TempContext->Instigator->GetGenericTeamId(), TempContext->Instigator->GetDataTags());
 	Manager->AddToSpawnMap(TempContext->Target->GetGenericTeamId(), TempContext->Target->GetDataTags());
@@ -83,8 +84,6 @@ void UTurnBasedSubsystem::InitializeTurnBasedField()
 		};
 		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
 	}
-
-	TempContext = nullptr;
 }
 
 void UTurnBasedSubsystem::EnterTurnBased(FPhaseTransitionToken InToken, UObject* Context)

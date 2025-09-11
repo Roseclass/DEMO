@@ -20,16 +20,10 @@ protected:
 public:
 	virtual void Tick(float DeltaTime) override;
 
-	// ISave interface
-	virtual	void OnBeforeSave(USaveGameData* SaveData) override;
-	virtual	void OnAfterLoad(USaveGameData* ReadData) override;
-	// End of ISave interface
-
 	//property
 private:
+	FTurnBasedCharacterRuntimeData RuntimeData;
 protected:
-	UPROPERTY(EditDefaultsOnly)
-		UTurnBasedCharacterData* TempDA;
 
 	//scene
 
@@ -40,4 +34,5 @@ public:
 private:
 protected:
 public:
+	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 };

@@ -92,10 +92,3 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
 		TSoftClassPtr<UAnimInstance> AnimBlueprint;
 };
-
-/*
-* da는 assetmanager에서 map 형태로 보관
-* spawn시에 savedata에서 무슨데이터를 사용할지 결정
-* 
-* 페이즈 변경 연결후 기존 skeletalmesh ,animbp 등등 softptr로 변경후 init
-*/

@@ -27,31 +27,6 @@ public:
 	// 서브 시스템 (레지스트리->맵)에서의 키값
 	UPROPERTY(Transient)
 		FGameplayTag DataTag;
-
-	// Action 입력시 사용할 어빌리티 태그
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FGameplayTag ActionTag;
-
-	// Action 상태 종료시 사용할 tag leaf name
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FName ActionEndLeaf = "End";
-
-	// Action trigger oncollsion시 사용할 tag leaf name
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FName ActionOnCollisionLeaf = "OnCollision";
-
-	// Action trigger offcollsion시 사용할 tag leaf name
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FName ActionOffCollisionLeaf = "OffCollision";
-
-	// Action trigger beginoverlap시 사용할 tag leaf name
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FName ActionOnBeginOverlapLeaf = "OnBeginOverlap";
-
-	// Action trigger endoverlap시 사용할 tag leaf name
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Action")
-		FName ActionOnEndOverlapLeaf = "OnEndOverlap";
-
 };
 
 UCLASS(BlueprintType)
@@ -81,10 +56,3 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
 		TSoftClassPtr<UAnimInstance> AnimBlueprint;
 };
-
-/*
-* da는 assetmanager에서 map 형태로 보관
-* spawn시에 savedata에서 무슨데이터를 사용할지 결정
-* 
-* 페이즈 변경 연결후 기존 skeletalmesh ,animbp 등등 softptr로 변경후 init
-*/

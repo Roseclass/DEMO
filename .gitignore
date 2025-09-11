@@ -74,5 +74,7 @@ Plugins/*/Intermediate/*
 DerivedDataCache/*
 
 # 용량 큰 폴더 제외
+/Content/ParagonGideon/*
 /Content/ParagonMorigesh/*
+/Content/ParagonRevenant/*
 /Content/ParagonTerra/*

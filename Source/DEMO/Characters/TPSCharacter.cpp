@@ -29,9 +29,6 @@ ATPSCharacter::ATPSCharacter()
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-
-	GetMesh()->SetRelativeLocation(FVector(0, 0, -97));
-	GetMesh()->SetRelativeRotation(FQuat(FRotator3d(0, -90, 0)));
 }
 void ATPSCharacter::BeginPlay()
 {

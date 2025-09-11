@@ -17,9 +17,7 @@ class UTurnBasedCharacterData;
 UENUM(BlueprintType)
 enum class ETurnBasedFieldId : uint8
 {
-    Forest01,
-    Desert01,
-    Cave01,
+    TEST,
     MAX
 };
 
@@ -35,8 +33,23 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
         FName LevelName;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-        FTransform Origin;
+    UPROPERTY(EditAnywhere)
+        FVector PlayerStart;
+
+    UPROPERTY(EditAnywhere)
+        FVector PlayerEnd;
+
+	UPROPERTY(EditAnywhere, meta = (DisplayName = "PlayerRotation"))
+        FQuat PlayerRotation;
+
+    UPROPERTY(EditAnywhere)
+        FVector EnemyStart;
+
+    UPROPERTY(EditAnywhere)
+        FVector EnemyEnd;
+
+	UPROPERTY(EditAnywhere, meta = (DisplayName = "EnemyRotation"))
+        FQuat EnemyRotation;
 };
 
 UCLASS(BlueprintType)

@@ -11,6 +11,7 @@
  *																	패배		-> LoadGame
  */
 
+struct FTurnBasedFieldLayoutRow;
 class ATurnBasedCharacter;
 class UTurnBasedCharacterData;
 
@@ -28,7 +29,9 @@ public:
 
 	//property
 private:
-	TMap<uint8, TArray<FGameplayTag>/*중복가능*/> SpawnMap;
+	FTurnBasedFieldLayoutRow* LevelData;
+
+	TMap<FGameplayTag, int32> SpawnRequestCountMap;
 	TMap<uint8, TArray<UTurnBasedCharacterData*>> PendingSpawnMap; 
 	TMap<uint8, TSet<ATurnBasedCharacter*>> SpawnedCharacterMap;
 protected:
@@ -36,10 +39,12 @@ public:
 
 	//function
 private:
-	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 	void TrySpawnCharacter();
+	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
+	void PlaceActorsOnField();
 protected:
 public:
+	void SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData);
 	void AddToSpawnMap(uint8 TeamID, TArray<FGameplayTag> InGameplayTags);
 	void RequestSpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 };
