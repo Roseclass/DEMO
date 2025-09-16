@@ -1,12 +1,18 @@
 #include "Characters/TurnBasedCharacter.h"
 #include "Global.h"
 
+#include "Components/SceneComponent.h"
+
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 
+#include "Characters/TurnBasedCameraComponent.h"
+
 ATurnBasedCharacter::ATurnBasedCharacter()
 {
-
+	CHelpers::CreateComponent<USceneComponent>(this, &SelectTargetPoint, "SelectTargetPoint", GetRootComponent());
+	CHelpers::CreateComponent<USceneComponent>(this, &SelectSkillPoint, "SelectSkillPoint", GetRootComponent());
+	CHelpers::CreateActorComponent<UTurnBasedCameraComponent>(this, &TurnBasedCamera, "TurnbasedCamera");
 }
 
 void ATurnBasedCharacter::BeginPlay()
@@ -17,7 +23,6 @@ void ATurnBasedCharacter::BeginPlay()
 void ATurnBasedCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	CLog::Print(GetActorLocation(), -1, 0, FColor::Black);
 }
 
 void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
@@ -33,7 +38,33 @@ void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 	GetMesh()->SetAnimInstanceClass(turnbasedData->AnimBlueprint.Get());
 
 	//asc
-	TArray<FAbilitySpecInfo> abilities = turnbasedData->GrantedAbilities;
+	TArray<FAbilitySpecInfo> abilities;
+	for (auto i : turnbasedData->GrantedAbilities)abilities.Add(i.Value);
 	for (auto& i : abilities)i.SourceObject = turnbasedData;
-	Ability->Init(abilities);
+	Ability->InitGA(abilities);
+	Ability->InitAttributes(&turnbasedData->AttributeInitialInfo);
+}
+
+FGameplayTag ATurnBasedCharacter::GetDataTag() const
+{
+	return RuntimeData.DataTag;
+}
+
+FTransform ATurnBasedCharacter::GetSelectTargetTransform() const
+{
+	return FTransform();
+}
+
+FTransform ATurnBasedCharacter::GetSelectSkillTransform() const
+{
+	return FTransform();
+}
+
+float ATurnBasedCharacter::GetSpeed() const
+{
+	return Ability->GetSpeed();
+}
+float ATurnBasedCharacter::GetTurnGauge() const
+{
+	return Ability->GetTurnGauge();
 }

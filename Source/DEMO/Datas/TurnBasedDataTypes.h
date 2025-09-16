@@ -50,6 +50,9 @@ public:
 
 	UPROPERTY(EditAnywhere, meta = (DisplayName = "EnemyRotation"))
         FQuat EnemyRotation;
+
+    UPROPERTY(EditAnywhere)
+        FTransform CameraInitalTranform;
 };
 
 UCLASS(BlueprintType)

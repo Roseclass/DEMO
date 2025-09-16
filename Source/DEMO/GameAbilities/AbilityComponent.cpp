@@ -1,6 +1,8 @@
 #include "GameAbilities/AbilityComponent.h"
 #include "Global.h"
 
+#include "Characters/TurnBasedCharacterData.h"
+
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/GA_BaseAbility.h"
 
@@ -25,7 +27,7 @@ void UAbilityComponent::TickComponent(float DeltaTime, enum ELevelTick TickType,
 	}
 }
 
-void UAbilityComponent::Init(const TArray<FAbilitySpecInfo>& NewGAs)
+void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 {
 	for (auto i : NewGAs)
 	{
@@ -40,6 +42,20 @@ void UAbilityComponent::Init(const TArray<FAbilitySpecInfo>& NewGAs)
 
 	//OnGameplayEffectAppliedDelegateToSelf.AddUFunction(this, "HitReaction");
 }
+
+void UAbilityComponent::InitAttributes(const FAttributeInitialInfo* NewStats)
+{
+	for (auto i : NewStats->InitalStats)
+	{
+		UGameplayEffect* GE = NewObject<UGameplayEffect>(this);
+		GE->DurationPolicy = EGameplayEffectDurationType::Instant;
+		GE->Modifiers.Add(i);
+		FGameplayEffectContextHandle context = MakeEffectContext();
+		FGameplayEffectSpec Spec(GE, context);
+		ApplyGameplayEffectSpecToSelf(Spec);
+	}
+}
+
 float UAbilityComponent::GetDefense() const
 {
 	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));
@@ -69,10 +85,9 @@ float UAbilityComponent::GetSpeed() const
 	float multiplicitiveSpeed = attribute->GetMultiplicitiveSpeed() * 0.01;
 	return (speed + additiveSpeed) * multiplicitiveSpeed;
 }
-	//for (auto i : Ability->GetActivatableAbilities())
-	//{
-	//	TArray<FGameplayTag> arr;
-	//	i.Ability->AbilityTags.GetGameplayTagArray(arr);
-	//	for (auto tag : arr)
-	//		CLog::Print(tag.GetTagName().ToString());
-	//}
+
+float UAbilityComponent::GetTurnGauge() const
+{
+	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));
+	return attribute->GetTurnGauge();
+}

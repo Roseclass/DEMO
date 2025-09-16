@@ -68,6 +68,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "Status|Speed")
         FGameplayAttributeData MultiplicitiveSpeed;
 
+    UPROPERTY(BlueprintReadOnly, Category = "Status|TurnBased")
+        FGameplayAttributeData TurnGauge;
+
 public:
 
 	//function
@@ -87,6 +90,7 @@ public:
     ATTRIBUTE_ACCESSORS(UAttributeSet_Character, Speed);
     ATTRIBUTE_ACCESSORS(UAttributeSet_Character, AdditiveSpeed);
     ATTRIBUTE_ACCESSORS(UAttributeSet_Character, MultiplicitiveSpeed);
+    ATTRIBUTE_ACCESSORS(UAttributeSet_Character, TurnGauge);
 };
 
 /*

@@ -6,14 +6,16 @@
 #include "TurnBasedPhaseManager.generated.h"
 
 /**
- * FindNextTurn -> SelectTarget <-> SelectSkill -> PlaySequence -> EndTurn	-> FindNextTurn
- *																	½Â¸®		-> EnterField
- *																	ÆÐ¹è		-> LoadGame
+ * FindNextTurn	-> SelectTask -> SelectTarget <-> SelectSkill -> PlaySequence -> EndTurn	-> FindNextTurn
+ *																					½Â¸®		-> EnterField
+ *																					ÆÐ¹è		-> LoadGame
  */
 
 struct FTurnBasedFieldLayoutRow;
+class ATurnbasedPhaseCamera;
 class ATurnBasedCharacter;
 class UTurnBasedCharacterData;
+class ASelectWidgetActor;
 
 UCLASS()
 class DEMO_API ATurnBasedPhaseManager : public AActor
@@ -31,17 +33,37 @@ public:
 private:
 	FTurnBasedFieldLayoutRow* LevelData;
 
+	ATurnbasedPhaseCamera* Camera;
+	TSubclassOf<ASelectWidgetActor>SelectTargetClass;
+	ASelectWidgetActor* SelectTarget;
+	TSubclassOf<ASelectWidgetActor>SelectSkillClass;
+	ASelectWidgetActor* SelectSkill;
+	ATurnBasedCharacter* CurrentTurnCharacter;
+	ATurnBasedCharacter* TargetCharacter;
+
 	TMap<FGameplayTag, int32> SpawnRequestCountMap;
 	TMap<uint8, TArray<UTurnBasedCharacterData*>> PendingSpawnMap; 
 	TMap<uint8, TSet<ATurnBasedCharacter*>> SpawnedCharacterMap;
+	TArray<ATurnBasedCharacter*> LocationArray[2];
 protected:
 public:
 
 	//function
 private:
+	void SpawnCamera();
+	void SpawnSelectTarget();
+	void SpawnSelectSkill();
 	void TrySpawnCharacter();
 	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 	void PlaceActorsOnField();
+
+	void FindNextTurn();
+	void FocusSelectTarget();
+	void FocusSelectSkill();
+	void PlaySequence();
+	void EndTurn();
+
+	UFUNCTION()void ConfirmTarget(ATurnBasedCharacter* InTarget);
 protected:
 public:
 	void SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData);

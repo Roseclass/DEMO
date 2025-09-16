@@ -27,6 +27,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	// IGenericTeamAgentInterface interface
+	virtual void SetGenericTeamId(const FGenericTeamId& TeamID) final override;
 	virtual FGenericTeamId GetGenericTeamId() const override;
 	// End of IGenericTeamAgentInterface interface
 
@@ -43,6 +44,7 @@ public:
 	//property
 private:
 	FGuid UniqueSaveName;
+	uint8 GenericTeamId = 1;
 protected:
 	//scene
 
@@ -51,19 +53,8 @@ protected:
 		UAbilityComponent* Ability;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = GAS, meta = (AllowPrivateAccess = "true"))
-		UAttributeSet_Character* AttributeSet;
+		UAttributeSet_Character* AttributeSet;	
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-		USpringArmComponent* CameraBoom;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-		UCameraComponent* FollowCamera;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Input)
-		float TurnRateGamepad;
-
-	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = true))
-		uint8 TeamID = 1; //enum으로 변경
 
 	//function
 private:
@@ -72,8 +63,4 @@ public:
 	virtual void Init(FGuid NewSaveName,UPrimaryDataAsset* DA);
 	virtual FGameplayTag GetDataTag() const;
 	virtual TArray<FGameplayTag> GetDataTags() const;
-
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-
 };

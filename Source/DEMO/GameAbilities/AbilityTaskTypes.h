@@ -13,7 +13,7 @@
  * 
  */
 
-//#include "Abilities/AbilityTaskTypes.h"
+//#include "GameAbilities/AbilityTaskTypes.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FAbilityTaskEventDelegate, FGameplayTag, EventTag, FGameplayEventData, EventData);
 

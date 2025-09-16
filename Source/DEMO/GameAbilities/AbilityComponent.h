@@ -10,6 +10,7 @@
  */
 
 class UGA_BaseAbility;
+struct FAttributeInitialInfo;
 
 USTRUCT(BlueprintType)
 struct FSkillData : public FTableRowBase
@@ -61,11 +62,13 @@ public:
 private:
 protected:
 public:
-	void Init(const TArray<FAbilitySpecInfo>& NewGAs);
+	void InitGA(const TArray<FAbilitySpecInfo>& NewGAs);
+	void InitAttributes(const FAttributeInitialInfo* NewStats);
 
 	float GetDefense() const;
 	float GetPower() const;
 	float GetSpeed() const;
+	float GetTurnGauge() const;
 };
 
 

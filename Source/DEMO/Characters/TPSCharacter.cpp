@@ -1,8 +1,11 @@
 #include "Characters/TPSCharacter.h"
 #include "Global.h"
 
+#include "Camera/CameraComponent.h"
+
 #include "Components/InputComponent.h"
 
+#include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 #include "DEMOGameInstance.h"
@@ -18,6 +21,25 @@
 
 ATPSCharacter::ATPSCharacter()
 {
+	// Don't rotate when the controller rotates. Let that just affect the camera.
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	// Create a camera boom (pulls in towards the player if there is a collision)
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	CameraBoom->SetupAttachment(RootComponent);
+	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
+	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+
+	// Create a follow camera
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+
+	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
+	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...	
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
@@ -38,9 +60,6 @@ void ATPSCharacter::BeginPlay()
 void ATPSCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	
-	if(GetUniqueSaveName().IsValid())
-		CLog::Print(GetUniqueSaveName().ToString(), -1, 0);
 }
 
 void ATPSCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -83,7 +102,7 @@ void ATPSCharacter::OnAfterLoad(USaveGameData* ReadData)
 	}
 
 	CheckNull(data);
-	TeamID = data->TeamID;
+	SetGenericTeamId(data->TeamID);
 	SetActorTransform(data->Transform);
 }
 
@@ -149,7 +168,7 @@ void ATPSCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 	//asc
 	TArray<FAbilitySpecInfo> abilities = tpsData->GrantedAbilities;
 	for (auto& i : abilities)i.SourceObject = tpsData;
-	Ability->Init(abilities);
+	Ability->InitGA(abilities);
 
 	//Trigger
 	EventTrigger = GetWorld()->SpawnActorDeferred<AEventTrigger>(tpsData->ActionTrigger, FTransform());

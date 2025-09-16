@@ -9,6 +9,8 @@
  * 
  */
 
+class UTurnBasedCameraComponent;
+
 UCLASS()
 class DEMO_API ATurnBasedCharacter : public ABaseCharacter
 {
@@ -24,10 +26,17 @@ public:
 private:
 	FTurnBasedCharacterRuntimeData RuntimeData;
 protected:
-
 	//scene
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		USceneComponent* SelectTargetPoint;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		USceneComponent* SelectSkillPoint;
 
 	//actor
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UTurnBasedCameraComponent* TurnBasedCamera;
+
 public:
 
 	//function
@@ -35,4 +44,10 @@ private:
 protected:
 public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
+	virtual FGameplayTag GetDataTag() const override;
+
+	FTransform GetSelectTargetTransform() const;
+	FTransform GetSelectSkillTransform() const;
+	float GetSpeed() const;
+	float GetTurnGauge() const;
 };

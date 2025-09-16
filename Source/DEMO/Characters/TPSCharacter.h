@@ -43,6 +43,11 @@ private:
 protected:
 
 	//scene
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		USpringArmComponent* CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UCameraComponent* FollowCamera;
 
 	//actor
 public:
@@ -57,4 +62,8 @@ public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const ;
 	virtual TArray<FGameplayTag> GetDataTags() const override;
+
+
+	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 };
