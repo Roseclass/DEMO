@@ -4,6 +4,7 @@
 #include "GameFramework/SaveGame.h"
 #include "GameplayTagContainer.h"
 #include "Global.h"
+#include "GameAbilities/AbilityUIEnums.h"
 #include "SaveLoadTypes.generated.h"
 
 /**
@@ -63,6 +64,17 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct FSaveUIData
+{
+	GENERATED_BODY()
+
+public:
+	// UISetting
+	UPROPERTY(VisibleAnywhere, Category = "TurnBased")
+		FGameplayTag EquippedSkillTags[int32(ESkillSlotLocation::MAX)];
+};
+
+USTRUCT(BlueprintType)
 struct FSaveData
 {
 	GENERATED_BODY()
@@ -97,6 +109,10 @@ public:
 		saveGameData->SavedPlayerDatas[key].Transform.SetTranslation(FVector(900, 1120, 96));
 		saveGameData->SavedPlayerDatas[key].Transform.SetRotation(FQuat4d(FRotator(0, 0, 0)));
 
+		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Gideon"));
+		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Revenant"));
+		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Terra"));
+
 		key = FGuid::NewGuid();
 		saveGameData->SavedEnemyDatas;
 		saveGameData->SavedEnemyDatas.Add(key, FSaveData());
@@ -110,6 +126,9 @@ public:
 public:
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 		TMap<FGuid, FSaveData> SavedPlayerDatas;
+
+	UPROPERTY(VisibleAnywhere, Category = "Default")
+		TMap<FGameplayTag, FSaveUIData> SavedPlayerUIDatas; // {CharacterDataTag,UIData}
 
 	UPROPERTY(VisibleAnywhere, Category = "Default")
 		TMap<FGuid, FSaveData> SavedEnemyDatas;

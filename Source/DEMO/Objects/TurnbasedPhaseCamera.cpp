@@ -49,7 +49,7 @@ void ATurnbasedPhaseCamera::FocusSelectTarget()
 
 void ATurnbasedPhaseCamera::FocusSelectSkill(ATurnBasedCharacter* InCurrentTurnCharacter)
 {
-
+	SetActorTransform(InCurrentTurnCharacter->GetSelectSkillTransform());
 }
 
 void ATurnbasedPhaseCamera::SetTargetRotation(FRotator NewRotation)
@@ -60,6 +60,5 @@ void ATurnbasedPhaseCamera::SetTargetRotation(FRotator NewRotation)
 
 bool ATurnbasedPhaseCamera::IsRotating()const 
 {
-	CLog::Print(bRotating);
 	return bRotating; 
 }

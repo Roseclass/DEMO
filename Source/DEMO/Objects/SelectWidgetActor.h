@@ -10,6 +10,7 @@
 
 class UUserWidget;
 class UWidgetComponent;
+class USceneComponent;
 class ATurnBasedCharacter;
 class ATurnBasedPhaseManager;
 
@@ -38,6 +39,9 @@ private:
 protected:
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+		USceneComponent* Origin;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 		UWidgetComponent* Widget;
 
 	FOnSelectWidgetActorShown OnSelectWidgetActorShown;
@@ -50,4 +54,5 @@ public:
 	UUserWidget* GetWidgetObject();
 	void Show();
 	void Hide();
+	void SetWidgetRelativeTransform(FTransform InTransform);
 };

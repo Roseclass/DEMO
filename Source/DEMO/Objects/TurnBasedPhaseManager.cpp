@@ -15,6 +15,7 @@
 #include "Objects/TurnbasedPhaseCamera.h"
 
 #include "Widgets/UW_SelectTarget.h"
+#include "Widgets/UW_SelectSkill.h"
 
 ATurnBasedPhaseManager::ATurnBasedPhaseManager()
 {
@@ -45,6 +46,7 @@ void ATurnBasedPhaseManager::SpawnCamera()
 	pc->SetInputMode(FInputModeUIOnly());
 	pc->SetViewTargetWithBlend(Camera);
 }
+
 void ATurnBasedPhaseManager::SpawnSelectTarget()
 {
 	SelectTarget = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectTargetClass, FTransform(), this);
@@ -67,6 +69,12 @@ void ATurnBasedPhaseManager::SpawnSelectTarget()
 void ATurnBasedPhaseManager::SpawnSelectSkill()
 {
 	SelectSkill = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectSkillClass, FTransform(), this);
+	UUW_SelectSkill* selectSkill = Cast<UUW_SelectSkill>(SelectSkill->GetWidgetObject());
+	TFunction<void(FGameplayTag)>func = [this](FGameplayTag InSkillTag)
+	{
+		this->ConfirmSkill(InSkillTag);
+	};
+	selectSkill->OnConfirmDown.AddLambda(func);
 }
 
 void ATurnBasedPhaseManager::TrySpawnCharacter()
@@ -138,7 +146,7 @@ void ATurnBasedPhaseManager::PlaceActorsOnField()
 void ATurnBasedPhaseManager::FindNextTurn()
 {
 	//
-	// (이드위젯에 뒤에 순서가 어떻게되는지 스택해두기, 스피드 변경으로 순서바뀌면 gcn으로 터트리기?
+	// 사이드위젯에 뒤에 순서가 어떻게되는지 스택해두기, 스피드 변경으로 순서바뀌면 gcn으로 터트리기?
 	//
 
 	TArray<TTuple<float, ATurnBasedCharacter*>>Next;
@@ -171,7 +179,25 @@ void ATurnBasedPhaseManager::FindNextTurn()
 	Next.Sort();
 	CurrentTurnCharacter = Next[Next.Num() - 1].Value;
 
-	FocusSelectTarget();
+	FocusSelectSkill();
+}
+
+void ATurnBasedPhaseManager::FocusSelectSkill()
+{
+	//
+	// 카메라 위치 이동 시키기(CurrentTurnCharacter의 selectskill 위치로 카메라 이동)
+	// 위젯인풋이 먹히는지?
+	//
+
+	Camera->FocusSelectSkill(CurrentTurnCharacter);
+	SelectSkill->SetActorTransform(CurrentTurnCharacter->GetSelectSkillTransform());
+	SelectSkill->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
+
+	UUW_SelectSkill* selectSkill = Cast<UUW_SelectSkill>(SelectSkill->GetWidgetObject());
+
+	selectSkill->Activate(CurrentTurnCharacter);
+
+	SelectSkill->Show();
 }
 
 void ATurnBasedPhaseManager::FocusSelectTarget()
@@ -185,15 +211,6 @@ void ATurnBasedPhaseManager::FocusSelectTarget()
 	selectTarget->Activate(LocationArray[targetID]);
 
 	SelectTarget->Show();
-}
-
-void ATurnBasedPhaseManager::FocusSelectSkill()
-{
-	//
-	// 카메라 위치 이동 시키기(CurrentTurnCharacter의 selectskill 위치로 카메라 이동)
-	// 위젯인풋이 먹히는지?
-	//
-
 }
 
 void ATurnBasedPhaseManager::PlaySequence()
@@ -213,11 +230,18 @@ void ATurnBasedPhaseManager::EndTurn()
 	//
 }
 
+void ATurnBasedPhaseManager::ConfirmSkill(FGameplayTag InSkillTag)
+{
+	//UNDONE
+	SelectSkill->Hide();
+	FocusSelectTarget();
+}
+
 void ATurnBasedPhaseManager::ConfirmTarget(ATurnBasedCharacter* InTarget)
 {
 	SelectTarget->Hide();
 	TargetCharacter = InTarget;
-	FocusSelectSkill();
+	PlaySequence();
 }
 
 void ATurnBasedPhaseManager::SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData)

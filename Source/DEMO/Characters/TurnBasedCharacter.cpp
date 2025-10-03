@@ -1,7 +1,7 @@
 #include "Characters/TurnBasedCharacter.h"
 #include "Global.h"
 
-#include "Components/SceneComponent.h"
+#include "SaveLoadSubsystem.h"
 
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
@@ -10,8 +10,6 @@
 
 ATurnBasedCharacter::ATurnBasedCharacter()
 {
-	CHelpers::CreateComponent<USceneComponent>(this, &SelectTargetPoint, "SelectTargetPoint", GetRootComponent());
-	CHelpers::CreateComponent<USceneComponent>(this, &SelectSkillPoint, "SelectSkillPoint", GetRootComponent());
 	CHelpers::CreateActorComponent<UTurnBasedCameraComponent>(this, &TurnBasedCamera, "TurnbasedCamera");
 }
 
@@ -31,15 +29,28 @@ void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 
 	UTurnBasedCharacterData* turnbasedData = Cast<UTurnBasedCharacterData>(DA);
 	CheckTrue_Print(!turnbasedData, "turnbasedData cast Fail!!");
-	RuntimeData.bInitComplete = 1;
-	RuntimeData = turnbasedData->RuntimeData;
+
+	//init asset
 	GetMesh()->SetSkeletalMesh(turnbasedData->SkeletalMesh.Get());
 	GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
 	GetMesh()->SetAnimInstanceClass(turnbasedData->AnimBlueprint.Get());
 
+	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+	const FSaveUIData* uiData = &SLS->ReadGameData()->SavedPlayerUIDatas.FindOrAdd(turnbasedData->SkillRootTag);
+
+	//runtimedata
+	RuntimeData = turnbasedData->RuntimeData;
+	RuntimeData.bInitComplete = 1;
+	for (int32 i = 0; i < int32(ESkillSlotLocation::MAX); i++)
+		RuntimeData.EquippedSkillTags[i] = uiData->EquippedSkillTags[i];
+
 	//asc
 	TArray<FAbilitySpecInfo> abilities;
-	for (auto i : turnbasedData->GrantedAbilities)abilities.Add(i.Value);
+	for (auto i : uiData->EquippedSkillTags)
+	{
+		if (!turnbasedData->GrantedAbilities.Contains(i))continue;
+		abilities.Add(turnbasedData->GrantedAbilities[i]);
+	}
 	for (auto& i : abilities)i.SourceObject = turnbasedData;
 	Ability->InitGA(abilities);
 	Ability->InitAttributes(&turnbasedData->AttributeInitialInfo);
@@ -52,18 +63,32 @@ FGameplayTag ATurnBasedCharacter::GetDataTag() const
 
 FTransform ATurnBasedCharacter::GetSelectTargetTransform() const
 {
-	return FTransform();
+	return RuntimeData.SelectTargetTransform * GetActorTransform();
 }
 
 FTransform ATurnBasedCharacter::GetSelectSkillTransform() const
 {
-	return FTransform();
+	return RuntimeData.SelectSkillTransform * GetActorTransform();
+}
+
+FTransform ATurnBasedCharacter::GetSelectSkillRelativeTransform() const
+{
+	return RuntimeData.SelectSkillRelativeTransform;
+}
+
+TArray<FGameplayTag> ATurnBasedCharacter::GetEquippedSkillTags() const
+{
+	TArray<FGameplayTag> result;
+	for (auto i : RuntimeData.EquippedSkillTags)
+		result.Add(i);
+	return result;
 }
 
 float ATurnBasedCharacter::GetSpeed() const
 {
 	return Ability->GetSpeed();
 }
+
 float ATurnBasedCharacter::GetTurnGauge() const
 {
 	return Ability->GetTurnGauge();

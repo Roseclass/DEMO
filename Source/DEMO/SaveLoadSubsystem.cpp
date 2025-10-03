@@ -159,6 +159,11 @@ ESaveLoadResult USaveLoadSubsystem::SaveData()
 	return ESaveLoadResult::Success;
 }
 
+void USaveLoadSubsystem::UpdateUISaveData(FGameplayTag DataTag, FSaveUIData NewSaveData)
+{
+	CachedGameData->SavedPlayerUIDatas.FindOrAdd(DataTag) = NewSaveData;
+}
+
 ESaveLoadResult USaveLoadSubsystem::LoadData(int32 InSlotIndex)
 {
 	// check SlotIndex

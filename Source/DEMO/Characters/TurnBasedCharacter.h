@@ -11,6 +11,8 @@
 
 class UTurnBasedCameraComponent;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAnimTagChanged, FGameplayTag);
+
 UCLASS()
 class DEMO_API ATurnBasedCharacter : public ABaseCharacter
 {
@@ -27,17 +29,13 @@ private:
 	FTurnBasedCharacterRuntimeData RuntimeData;
 protected:
 	//scene
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-		USceneComponent* SelectTargetPoint;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
-		USceneComponent* SelectSkillPoint;
 
 	//actor
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		UTurnBasedCameraComponent* TurnBasedCamera;
 
 public:
+	FOnAnimTagChanged OnAnimTagChanged;
 
 	//function
 private:
@@ -46,8 +44,13 @@ public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const override;
 
+	//from runtime
 	FTransform GetSelectTargetTransform() const;
 	FTransform GetSelectSkillTransform() const;
+	FTransform GetSelectSkillRelativeTransform() const;
+	TArray<FGameplayTag> GetEquippedSkillTags() const;
+
+	//from asc
 	float GetSpeed() const;
 	float GetTurnGauge() const;
 };

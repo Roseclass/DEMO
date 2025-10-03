@@ -6,16 +6,18 @@
 #include "TurnBasedPhaseManager.generated.h"
 
 /**
- * FindNextTurn	-> SelectTask -> SelectTarget <-> SelectSkill -> PlaySequence -> EndTurn	-> FindNextTurn
- *																					½Â¸®		-> EnterField
- *																					ÆÐ¹è		-> LoadGame
+ * FindNextTurn	-> SelectSkill <-> SelectTarget -> PlaySequence -> EndTurn	-> FindNextTurn
+ *																	½Â¸®		-> EnterField
+ *																	ÆÐ¹è		-> LoadGame
  */
 
+struct FGameplayAbilitySpec;
 struct FTurnBasedFieldLayoutRow;
 class ATurnbasedPhaseCamera;
 class ATurnBasedCharacter;
 class UTurnBasedCharacterData;
 class ASelectWidgetActor;
+
 
 UCLASS()
 class DEMO_API ATurnBasedPhaseManager : public AActor
@@ -58,12 +60,13 @@ private:
 	void PlaceActorsOnField();
 
 	void FindNextTurn();
-	void FocusSelectTarget();
 	void FocusSelectSkill();
+	void FocusSelectTarget();
 	void PlaySequence();
 	void EndTurn();
 
 	UFUNCTION()void ConfirmTarget(ATurnBasedCharacter* InTarget);
+	void ConfirmSkill(FGameplayTag InSkillTag);
 protected:
 public:
 	void SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData);

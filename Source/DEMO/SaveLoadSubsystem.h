@@ -42,6 +42,9 @@ public:
 	// Save the current state of the game
 	ESaveLoadResult SaveData();
 
+	// save after Update UISaveData
+	void UpdateUISaveData(FGameplayTag DataTag, FSaveUIData NewSaveData);
+
 	// Loads the current state of the game
 	ESaveLoadResult LoadData(int32 InSlotIndex);
 

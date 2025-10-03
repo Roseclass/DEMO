@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Datas/UITypes.h"
 #include "GameplayTagContainer.h"
 #include "GameplayTagsManager.h"
 #include "GameAbilities/AbilityTypes.h"
@@ -29,6 +30,19 @@ public:
 	// 서브 시스템 (레지스트리->맵)에서의 키값
 	UPROPERTY(Transient)
 		FGameplayTag DataTag;
+
+	// 슬롯 데이터
+	UPROPERTY(Transient)
+		FGameplayTag EquippedSkillTags[int32(ESkillSlotLocation::MAX)];
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Camera")
+		FTransform SelectTargetTransform;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Camera")
+		FTransform SelectSkillTransform;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Camera")
+		FTransform SelectSkillRelativeTransform;
 };
 
 UCLASS(BlueprintType)
@@ -43,7 +57,7 @@ public:
 			Mod.Attribute = UAttributeSet_Character::GetDefenseAttribute();
 			Mod.ModifierOp = EGameplayModOp::Additive;
 			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod); 
+			AttributeInitialInfo.InitalStats.Add(Mod);
 		}
 
 		{	//Power
@@ -51,7 +65,7 @@ public:
 			Mod.Attribute = UAttributeSet_Character::GetPowerAttribute();
 			Mod.ModifierOp = EGameplayModOp::Additive;
 			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod); 
+			AttributeInitialInfo.InitalStats.Add(Mod);
 		}
 
 		{	//Speed
@@ -59,23 +73,24 @@ public:
 			Mod.Attribute = UAttributeSet_Character::GetSpeedAttribute();
 			Mod.ModifierOp = EGameplayModOp::Additive;
 			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod); 
+			AttributeInitialInfo.InitalStats.Add(Mod);
 		}
 
-	}
+	};
 protected:
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override
 	{
 		Super::PostEditChangeProperty(PropertyChangedEvent);
-
-		GrantedAbilities.Empty();
 
 		UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
 		TSharedPtr<FGameplayTagNode> tagNode = Manager.FindTagNode(SkillRootTag);
 
 		if(!tagNode.IsValid())return;
 		for (auto i : tagNode->GetChildTagNodes())
+		{
+			if (GrantedAbilities.Contains(i->GetCompleteTag()))continue;
 			GrantedAbilities.FindOrAdd(i->GetCompleteTag());
+		}
 	};
 public:
 	// 캐릭터에 Init 때 복사할 데이터

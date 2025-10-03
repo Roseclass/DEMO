@@ -7,7 +7,8 @@
 UENUM(BlueprintType)
 enum class EAbilityType : uint8
 {
-    Active,
+    Attack,
+    Skill,
     Passive,
     MAX
 };

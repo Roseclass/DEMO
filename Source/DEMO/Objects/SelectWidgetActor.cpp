@@ -7,7 +7,8 @@
 
 ASelectWidgetActor::ASelectWidgetActor()
 {
-    CHelpers::CreateComponent<UWidgetComponent>(this, &Widget, "Widget");
+    CHelpers::CreateComponent<USceneComponent>(this, &Origin, "Origin");
+    CHelpers::CreateComponent<UWidgetComponent>(this, &Widget, "Widget", Origin);
 
 	PrimaryActorTick.bCanEverTick = true;
 }
@@ -57,4 +58,9 @@ void ASelectWidgetActor::Show()
 void ASelectWidgetActor::Hide()
 {
     SetActorHiddenInGame(1);
+}
+
+void ASelectWidgetActor::SetWidgetRelativeTransform(FTransform InTransform)
+{
+    Widget->SetRelativeTransform(InTransform);
 }
