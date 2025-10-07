@@ -16,17 +16,6 @@ void UAbilityComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
-void UAbilityComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	FGameplayTagContainer AllTags;
-	GetOwnedGameplayTags(AllTags);
-	for (auto tag : AllTags)
-	{
-		CLog::Print(tag.GetTagName().ToString(), -1, 0);
-	}
-}
-
 void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 {
 	for (auto i : NewGAs)

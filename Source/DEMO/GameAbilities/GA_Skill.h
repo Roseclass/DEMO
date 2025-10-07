@@ -2,7 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "GameAbilities/GA_MontageWithEvent.h"
-#include "Engine/NetSerialization.h"
+#include "Engine/DataAsset.h"
+#include "GameAbilities/AbilityUIEnums.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "GA_Skill.generated.h"
 
 /**
@@ -11,15 +13,14 @@
 
 class UAnimMontage;
 class ADamageDealer;
-class AWarningSign;
 
 USTRUCT(BlueprintType)
 struct FDamageDealerData
 {
 	GENERATED_BODY()
 public:
-	//UPROPERTY(EditAnywhere)
-	//	TSubclassOf<ADamageDealer> Class;
+	UPROPERTY(EditAnywhere)
+		TSubclassOf<ADamageDealer> Class;
 
 	UPROPERTY(EditAnywhere)
 		FName SocketName;
@@ -41,30 +42,6 @@ public:
 
 	UPROPERTY(EditAnywhere, meta = (EditCondition = "!bUseSocketRotation", EditConditionHides))
 		FRotator Rotation;
-};
-
-USTRUCT(BlueprintType)
-struct FWaringSignData
-{
-	GENERATED_BODY()
-public:
-	//UPROPERTY(EditAnywhere)
-	//	TSubclassOf<AWarningSign> WarningSignClass;
-
-	UPROPERTY(EditAnywhere)
-		float ForwardOffset = 0;
-
-	UPROPERTY(EditAnywhere)
-		float RightOffset = 0;
-
-	UPROPERTY(EditAnywhere)
-		FVector Scale = FVector(1, 1, 1);
-
-	UPROPERTY(EditAnywhere)
-		float Duration;
-
-	UPROPERTY(EditAnywhere)
-		float ExtraDuration;
 };
 
 USTRUCT(BlueprintType)
@@ -93,8 +70,10 @@ public:
 	UGA_Skill();
 protected:
 public:
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual float GetCooldownTimeRemaining(const FGameplayAbilityActorInfo* ActorInfo) const override;
+	virtual void GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const override;
 	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 	virtual const FGameplayTagContainer* GetCooldownTags() const override;
 	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
@@ -103,27 +82,32 @@ public:
 	//property
 private:
 protected:
-	UPROPERTY(EditAnywhere, Category = "Dealer")
-		TMap<FGameplayTag, FDamageDealerData> DamageDealerDataMap;
+	int32 CameraMoveDataIdx;
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<FCameraMoveEffectContext> CameraMoveDatas;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Damage")
+	int32 DamageDealerDataIdx;
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<FDamageDealerData> DamageDealerDatas;
+
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Data")
 		FDamageEhancementData DamageData;
-
-	UPROPERTY(EditAnywhere, Category = "Condition|Range")
-		float Range = 500.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Condition|Cost")
 		FScalableFloat CostBase;
 
-	UPROPERTY(EditAnywhere, Category = "Condition|Cooldown")
-		FScalableFloat CooldownBase;
+	UPROPERTY(EditDefaultsOnly, Category = "Condition|Cooldown")
+		int32 CooldownTurns;
 
-	UPROPERTY(EditAnywhere, Category = "WarningSign")
-		TMap<FGameplayTag, FWaringSignData> WarningSignDataMap;
+	UPROPERTY(BlueprintReadOnly, Category = "Condition|Cooldown")
+		int32 CooldownLeft;
 
 	UPROPERTY(Transient)
 		FGameplayTagContainer TempCooldownTags;
 public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextDamageDealerTriggerTag;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTagContainer CooldownTags;
 
@@ -132,12 +116,9 @@ public:
 
 	//function
 private:
-	virtual void SpawnDamageDealer(FGameplayTag EventTag);
-	virtual void SpawnWarningSign(FGameplayTag EventTag);
-	virtual void OnCollision();
-	virtual void OffCollision();
-	virtual void ResetHitActors();
 protected:
+	virtual void SpawnDamageDealer();
+	virtual void ApplyCameraMove();
 	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
 
 	virtual float GetCooldown(const FGameplayAbilityActorInfo* ActorInfo)const;
@@ -146,7 +127,26 @@ public:
 };
 
 /*
-* 주석부분 다시 채우기
 * 태그에 skill.@@@.Sequence1 같은 식으로 받고
 * 마지막 부분을 인덱스로 스킬시퀀스를 진행하는 방식으로하자
+* 맵<태그,클래스> 이걸로 스폰
+* 
+* 쿨다운 적용 방식
+* 쿨다운 태그는 블록 태그처럼 작동
+* 쿨다운 태그를 Duration 방식으로 적용해서 일정 시간 동안 사용을 막는다고 보면됨
+* 쿨다운 감지 또한 내가 정해둔 GE 태그가 적용되어 있는지 확인해보고
+* 그중 가장 길게 남은 시간을 쿨다운으로 처리함
+* 
+* 1-1.기존 applycooldown을 infinite로 적용하고 사용이 오랜시간동안 안되는지 확인
+* 1-2.checkcooldown 자체는 쿨다운 태그가 적용되어 있는지 확인만할뿐 그외에 작동은 하지 않음
+* 2.안되는게 확인되었다면 GetCooldownTimeRemaining, GetCooldownTimeRemainingAndDuration를 재정의해서 수동으로 쿨다운을 리턴
+* 3.턴진행에 따라 태그에 맞는 턴을 수동으로 걷어가야함
+* 
+* 
+* 턴진행 어빌리티가 필요, 캐릭터마다 턴스피드 관련된 어트리뷰트가필요
+* gamestate->next_turn 어빌리티
+* 다음 턴의 캐릭터를 찾아 start turn(어빌리티) - 행동 선택(ui) - 실행(어빌리티) - end turn(어빌리티) 식으로 진행
+* 
+* 현재 SelectSkill 부분에서 액티브가 가능하면 전부 UI슬롯에 올려둔다.
+* 스킬 슬롯 배치를 할때 액티브 가능 여부를 수정해야함
 */

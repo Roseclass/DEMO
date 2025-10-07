@@ -40,6 +40,7 @@ private:
 	ASelectWidgetActor* SelectTarget;
 	TSubclassOf<ASelectWidgetActor>SelectSkillClass;
 	ASelectWidgetActor* SelectSkill;
+	FGameplayTag CurrentSelectedSkillTag;
 	ATurnBasedCharacter* CurrentTurnCharacter;
 	ATurnBasedCharacter* TargetCharacter;
 

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "TurnbasedPhaseCamera.generated.h"
 
 class USpringArmComponent;
@@ -22,10 +23,19 @@ public:
 
 	//property
 private:
+	TWeakObjectPtr<ATurnBasedCharacter> CurrentTurnCharacter;
+
 	FTransform InitialTransform;
+	FTransform ReturnTransform;
+	FTransform GoalTrasnform;
 	bool bRotating;
-	float RotatingSpeed = 40;
-	FRotator TargetRotation;
+	bool bReturning;
+	float BlendTime = 0.1;
+	float ElapsedTime;
+
+	FCameraMoveEffectContext CurrentMoveEffect;
+	TWeakObjectPtr<AActor> LocationActor;
+	TWeakObjectPtr<AActor> LookAtTargetActor;
 protected:
 	//scene
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -39,7 +49,8 @@ public:
 
 	//function
 private:
-	void RInterpToTarget(float DeltaTime);
+	void ReturnInterp(float DeltaTime);
+	void RInterpToGoal(float DeltaTime);
 protected:
 public:
 	void Init(FTransform InTransform);
@@ -47,4 +58,6 @@ public:
 	void FocusSelectSkill(ATurnBasedCharacter* InCurrentTurnCharacter);
 	void SetTargetRotation(FRotator NewRotation);
 	bool IsRotating()const;
+
+	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
 };

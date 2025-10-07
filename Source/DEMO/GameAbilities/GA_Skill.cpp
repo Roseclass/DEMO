@@ -1,25 +1,74 @@
 #include "GameAbilities/GA_Skill.h"
 #include "Global.h"
+#include "GameplayCueManager.h"
 #include "GameplayTagContainer.h"
 #include "AbilitySystemGlobals.h"
 
-#include "DEMOCharacter.h"
+#include "Characters/TurnBasedCharacter.h"
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/AbilityTaskTypes.h"
 #include "GameAbilities/AT_MontageNotifyEvent.h"
 #include "Objects/DamageDealer.h"
-//#include "Objects/WarningSign.h"
-
-//#include "Components/InventoryComponent.h"
 
 UGA_Skill::UGA_Skill()
 {
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 }
 
-void UGA_Skill::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UGA_Skill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	CameraMoveDataIdx = 0;
+	DamageDealerDataIdx = 0;
+	ApplyCameraMove();
+}
+
+float UGA_Skill::GetCooldownTimeRemaining(const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	const UAbilitySystemComponent* const ASC = ActorInfo->AbilitySystemComponent.Get();
+	if (ASC)
+	{
+		const FGameplayTagContainer* Tags = GetCooldownTags();
+		if (Tags && Tags->Num() > 0)
+		{
+			FGameplayEffectQuery const Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(*Tags);
+			TArray< float > Durations = ASC->GetActiveEffectsTimeRemaining(Query);
+			if (Durations.Num() > 0)
+			{
+				return CooldownLeft;
+			}
+		}
+	}
+
+	return 0.f;
+}
+
+bool UGA_Skill::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, OUT FGameplayTagContainer* OptionalRelevantTags) const
+{
+	return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+void UGA_Skill::GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const
+{
+	TimeRemaining = 0.f;
+	CooldownDuration = 0.f;
+
+	const FGameplayTagContainer* Tags = GetCooldownTags();
+	if (Tags && Tags->Num() > 0)
+	{
+		UAbilitySystemComponent* const AbilitySystemComponent = ActorInfo->AbilitySystemComponent.Get();
+		check(AbilitySystemComponent != nullptr);
+
+		FGameplayEffectQuery const Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(*Tags);
+		TArray< TPair<float, float> > DurationAndTimeRemaining = AbilitySystemComponent->GetActiveEffectsTimeRemainingAndDuration(Query);
+		if (DurationAndTimeRemaining.Num() > 0)
+		{
+			TimeRemaining = CooldownLeft;
+			CooldownDuration = CooldownTurns;
+		}
+	}
 }
 
 void UGA_Skill::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
@@ -30,25 +79,25 @@ void UGA_Skill::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGa
 		int32 lv = GetAbilityLevel();
 		FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(CooldownGE->GetClass(), 1);
 
-		// set cooldown ge duration
+		// 쿨다운 GameplayEffect의 지속 시간을 설정
 		SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("Skill.Cooldown"), GetCooldown(ActorInfo));
 
-		// set DynamicGrantedTags
+		// DynamicGrantedTags를 설정
 		TArray<FGameplayTag> tags;
 		GetCooldownTags()->GetGameplayTagArray(tags);
 		for (auto tag : tags)
 			SpecHandle.Data.Get()->DynamicGrantedTags.AddTag(tag);
 
-		// apply
+		// 적용
 		ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, SpecHandle);
 	}
 }
 
 const FGameplayTagContainer* UGA_Skill::GetCooldownTags() const
 {
-	// get tags applied during cooldown
+	// 쿨다운 동안 적용된 태그들을 가져온다
 	FGameplayTagContainer* MutableTags = const_cast<FGameplayTagContainer*>(&TempCooldownTags);
-	MutableTags->Reset(); // MutableTags writes to the TempCooldownTags on the CDO so clear it in case the ability cooldown tags change (moved to a different slot)
+	MutableTags->Reset(); // MutableTags는 CDO의 TempCooldownTags에 값을 쓰기 때문에, 어빌리티 쿨다운 태그가 변경되었을 경우를 대비해 이를 초기화해줘야 한다 (예: 다른 슬롯으로 이동된 경우)
 	const FGameplayTagContainer* ParentTags = Super::GetCooldownTags();
 	if (ParentTags)
 	{
@@ -61,25 +110,25 @@ const FGameplayTagContainer* UGA_Skill::GetCooldownTags() const
 bool UGA_Skill::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags) const
 {
 	UGameplayEffect* CostGE = GetCostGameplayEffect();
-	//if (CostGE)
-	//{
-	//	UAbilityComponent* skillComp = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent.Get());
-	//	check(skillComp != nullptr);
+	if (CostGE)
+	{
+		UAbilityComponent* ASC = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent.Get());
+		check(ASC != nullptr);
 
-	//	float RequiredMana = GetCost(ActorInfo);
-	//	float CurrentMana = skillComp->GetNumericAttribute(UAttributeSetBase::GetManaAttribute());
+		float RequiredMana = GetCost(ActorInfo);
+		float CurrentMana = ASC->GetNumericAttribute(UAttributeSet_Character::GetManaAttribute());
 
-	//	if (RequiredMana > CurrentMana)
-	//	{
-	//		const FGameplayTag& CostTag = UAbilitySystemGlobals::Get().ActivateFailCostTag;
+		if (RequiredMana > CurrentMana)
+		{
+			const FGameplayTag& CostTag = UAbilitySystemGlobals::Get().ActivateFailCostTag;
 
-	//		if (OptionalRelevantTags && CostTag.IsValid())
-	//		{
-	//			OptionalRelevantTags->AddTag(CostTag);
-	//		}
-	//		return false;
-	//	}
-	//}
+			if (OptionalRelevantTags && CostTag.IsValid())
+			{
+				OptionalRelevantTags->AddTag(CostTag);
+			}
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -95,14 +144,15 @@ void UGA_Skill::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGamepl
 	}
 }
 
-void UGA_Skill::SpawnDamageDealer(FGameplayTag EventTag)
+void UGA_Skill::SpawnDamageDealer()
 {
-	//ADungeonCharacterBase* ch = Cast<ADungeonCharacterBase>(GetAvatarActorFromActorInfo());
-	//if (!ch)
-	//	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-	//UAbilityComponent* skill = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
-	//if (!skill)
-	//	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(GetAvatarActorFromActorInfo());
+	if (!ch)
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+
+	UAbilityComponent* ASC = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
+	if (!ASC)
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 
 	//FTransform transform = ch->GetMesh()->GetSocketTransform(DamageDealerDataMap[EventTag].SocketName);
 	//transform.SetScale3D(FVector(1.0f));
@@ -114,139 +164,72 @@ void UGA_Skill::SpawnDamageDealer(FGameplayTag EventTag)
 	//	loc += ch->GetActorUpVector() * DamageDealerDataMap[EventTag].UpDist;
 	//	transform.SetTranslation(loc);
 	//}
+
 	//if (!DamageDealerDataMap[EventTag].bUseSocketRotation)
 	//{
 	//	FRotator rot = ch->GetActorRotation();
 	//	transform.SetRotation(FQuat4d(rot + DamageDealerDataMap[EventTag].Rotation));
 	//}
 
-	////TODO::TEST
+	//TODO::TEST
 	//FSkillEhancementData data = skill->GetEhancementData(AbilityTags.First());
 	//ADamageDealer* dealer = GetWorld()->SpawnActorDeferred<ADamageDealer>(DamageDealerDataMap[EventTag].Class, transform, GetOwningActorFromActorInfo(),
 	//	ch, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	//dealer->SetOwner(ch);
 	//dealer->SetTeamID(ch->GetGenericTeamId());
-	//dealer->SetDamageAdditive(data.DamageAdditive);
-	//dealer->SetDamageMultiplicitive(data.DamageMultiplicitive);
+	////dealer->SetDamageAdditive(data.DamageAdditive);
+	////dealer->SetDamageMultiplicitive(data.DamageMultiplicitive);
 	//dealer->Activate();
 	//dealer->FinishSpawning(transform);
 }
 
-void UGA_Skill::SpawnWarningSign(FGameplayTag EventTag)
+void UGA_Skill::ApplyCameraMove()
 {
-	//ADungeonCharacterBase* ch = Cast<ADungeonCharacterBase>(GetAvatarActorFromActorInfo());
-	//if (!ch)
-	//	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
 
-	//UAbilityComponent* skill = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
-	//if (!skill)
-	//	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
+	gameplayCueParameters.EffectContext.AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
 
-	//FTransform transform;
-	//transform.SetScale3D(WarningSignDataMap[EventTag].Scale);
-	//{
-	//	FVector loc = ch->GetActorLocation();
-	//	loc += ch->GetActorForwardVector() * WarningSignDataMap[EventTag].ForwardOffset;
-	//	loc += ch->GetActorRightVector() * WarningSignDataMap[EventTag].RightOffset;
-
-	//	FHitResult result;
-	//	GetWorld()->LineTraceSingleByObjectType(result, ch->GetActorLocation() + FVector(0, 0, 1000), ch->GetActorLocation() + FVector(0, 0, -1000),
-	//		FCollisionObjectQueryParams(ECollisionChannel::ECC_WorldStatic));
-
-	//	transform.SetTranslation(result.Location);
-	//}
-
-	//skill->Multicast_WarningSign(WarningSignDataMap[EventTag].WarningSignClass, transform, GetOwningActorFromActorInfo(),
-	//	ch, ESpawnActorCollisionHandlingMethod::AlwaysSpawn, WarningSignDataMap[EventTag].Duration, WarningSignDataMap[EventTag].ExtraDuration);
-}
-
-void UGA_Skill::OnCollision()
-{
-	//UInventoryComponent* inv = CHelpers::GetComponent<UInventoryComponent>(GetOwningActorFromActorInfo());
-	//CheckNull(inv);
-	//inv->OnCollision(&DamageData);
-}
-
-void UGA_Skill::OffCollision()
-{
-	//UInventoryComponent* inv = CHelpers::GetComponent<UInventoryComponent>(GetOwningActorFromActorInfo());
-	//CheckNull(inv);
-	//inv->OffCollision();
-}
-
-void UGA_Skill::ResetHitActors()
-{
-	//UInventoryComponent* inv = CHelpers::GetComponent<UInventoryComponent>(GetOwningActorFromActorInfo());
-	//CheckNull(inv);
-	//inv->ResetHitActors();
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);
 }
 
 void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
 {
-	// Montage told us to end the ability before the montage finished playing.
-	// Montage was set to continue playing animation even after ability ends so this is okay.
+	// 몽타주는 어빌리티가 끝나도 계속 재생된다.
 	if (EventTag == EndTag)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-
-	// Only spawn projectiles on the Server.
-	// Predicting projectiles is an advanced topic not covered in this example.
-	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && DamageDealerDataMap.Contains(EventTag))
-		SpawnDamageDealer(EventTag);
-
-	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && WarningSignDataMap.Contains(EventTag))
-		SpawnWarningSign(EventTag);
-
-	if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && EventTag == FGameplayTag::RequestGameplayTag(FName("Event.OnCollision")))
-		OnCollision();
-
-	else if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && EventTag == FGameplayTag::RequestGameplayTag(FName("Event.OffCollision")))
-		OffCollision();
-
-	else if (GetOwningActorFromActorInfo()->GetLocalRole() == ROLE_Authority && EventTag == FGameplayTag::RequestGameplayTag(FName("Event.OffCollision")))
-		OffCollision();
+	else if (EventTag == NextMontageTriggerTag)
+	{
+		PlayKeyMontage();
+		PlaySubMontages();
+		++MontageDataIdx;
+		return;
+	}
+	else if(EventTag == NextCameraMoveTriggerTag)
+	{
+		ApplyCameraMove();
+		return;
+	}
+	else if(EventTag == NextDamageDealerTriggerTag)
+	{		
+		SpawnDamageDealer();
+		return;
+	}
 }
 
 float UGA_Skill::GetCooldown(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	return 0;
-
-	//UAbilityComponent* skill = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent);
-	//FSkillEhancementData data = skill->GetEhancementData(AbilityTags.First());
-	//int32 lv = GetAbilityLevel();
-	//float base = CooldownBase.GetValueAtLevel(lv);
-	//float addtive = data.CooldownAdditive;
-	//float multiplicitive = (data.CooldownMultiplicitive) * 0.01;
-	//float result = (base - addtive) * multiplicitive;
-
-	//if (result < base * 0.3)result = base * 0.3;
-
-	//return result;
+	UAbilityComponent* ASC = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent);
+	return CooldownTurns;
 }
 
 float UGA_Skill::GetCost(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	return 0;
-
-	//UAbilityComponent* skill = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent);
-	//FSkillEhancementData data = skill->GetEhancementData(AbilityTags.First());
-	//int32 lv = GetAbilityLevel();
-	//float base = CostBase.GetValueAtLevel(lv);
-	//float addtive = data.CostAdditive;
-	//float multiplicitive = (data.CostMultiplicitive) * 0.01;
-	//float result = (base - addtive) * multiplicitive;
-
-	//if (result < 0)result = 0;
-
-	//return -result;
+	UAbilityComponent* skill = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent);
+	int32 lv = GetAbilityLevel();
+	return CostBase.GetValueAtLevel(lv);
 }
-
-/*
-* 장비장착,변경,해제시에 어빌리티의 강화수치를 조절한다
-* 기본적으로 적용되어야하는 이펙트는 어떻게 설정할것인?
-* 1.장착,해제시에 이펙트를 적용한다. (완)
-* 2.데미지계산시에 캐릭터의 어트리뷰트를 캡쳐해 사용한다.
-* 2-1.실시간으로할지 시전시로할지는 추후에 결정
-*/

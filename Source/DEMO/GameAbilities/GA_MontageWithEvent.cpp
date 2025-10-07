@@ -2,6 +2,7 @@
 #include "Global.h"
 #include "GameplayTagContainer.h"
 
+#include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AT_MontageNotifyEvent.h"
 
 UGA_MontageWithEvent::UGA_MontageWithEvent()
@@ -13,16 +14,47 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	// 몽타주를 재생하고 이벤트를 기다린다
-	UAT_MontageNotifyEvent* Task = UAT_MontageNotifyEvent::CreateMontageNotifyEvent(this, NAME_None, Montage, FGameplayTagContainer(), 1.0f, NAME_None, false, 1.0f);
-	Task->OnBlendOut.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
-	Task->OnCompleted.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
-	Task->OnInterrupted.AddDynamic(this, &UGA_MontageWithEvent::OnCancelled);
-	Task->OnCancelled.AddDynamic(this, &UGA_MontageWithEvent::OnCancelled);
-	Task->EventReceived.AddDynamic(this, &UGA_MontageWithEvent::EventReceived);
+	MontageDataIdx = 0;
 
-	// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
-	Task->ReadyForActivation();
+	// 몽타주를 재생하고 이벤트를 기다린다
+	FTimerHandle WaitHandle;
+	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
+		{
+			UAT_MontageNotifyEvent* Task = UAT_MontageNotifyEvent::CreateMontageNotifyEvent(
+				this,
+				NAME_None,
+				MontageDatas[MontageDataIdx].KeyMontage,
+				FGameplayTagContainer(),
+				MontageDatas[MontageDataIdx].PlayRate,
+				MontageDatas[MontageDataIdx].StartSection,
+				false);
+			Task->OnBlendOut.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
+			Task->OnCompleted.AddDynamic(this, &UGA_MontageWithEvent::OnCompleted);
+			Task->OnInterrupted.AddDynamic(this, &UGA_MontageWithEvent::OnCancelled);
+			Task->OnCancelled.AddDynamic(this, &UGA_MontageWithEvent::OnCancelled);
+			Task->EventReceived.AddDynamic(this, &UGA_MontageWithEvent::EventReceived);
+
+			// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
+			Task->ReadyForActivation();
+
+			PlaySubMontages();
+
+			MontageDataIdx++;
+
+		}), MontageDatas[MontageDataIdx].StartDelay, false);
+}
+
+void UGA_MontageWithEvent::PlayKeyMontage()
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	asc->PlayMontage(this, GetCurrentActivationInfo(), MontageDatas[MontageDataIdx].KeyMontage, MontageDatas[MontageDataIdx].PlayRate, MontageDatas[MontageDataIdx].StartSection);
+}
+
+void UGA_MontageWithEvent::PlaySubMontages()
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	for(auto montage : MontageDatas[MontageDataIdx].SubMontages)
+		asc->PlayMontage(this, GetCurrentActivationInfo(), montage, MontageDatas[MontageDataIdx].PlayRate, MontageDatas[MontageDataIdx].StartSection);
 }
 
 void UGA_MontageWithEvent::OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData)

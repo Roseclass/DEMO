@@ -10,37 +10,8 @@
  */
 
 class UGA_BaseAbility;
+class ATurnBasedCharacter;
 struct FAttributeInitialInfo;
-
-USTRUCT(BlueprintType)
-struct FSkillData : public FTableRowBase
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(EditAnywhere, Category = "Class")
-		TSubclassOf<UGA_BaseAbility> SkillClass;
-
-	//UPROPERTY(EditAnywhere, Category = "Class")
-	//	ESkillTreeSkillState BaseState;
-
-	//UPROPERTY(EditAnywhere, Category = "Widget", meta = (DisplayThumbnail = "true", DisplayName = "Image", AllowedClasses = "Texture,MaterialInterface,SlateTextureAtlasInterface", DisallowedClasses = "MediaTexture"))
-	//	TObjectPtr<UObject> SkillImage;
-
-	//UPROPERTY(EditAnywhere, Category = "Widget")
-	//	FVector2D PannelPosition;
-
-	//UPROPERTY(EditAnywhere, Category = "Widget")
-	//	FVector2D ParentPosition = FVector2D(-1, -1);
-
-	//UPROPERTY(EditAnywhere, Category = "Widget")
-	//	UMediaSource* PreviewSource;
-
-	//UPROPERTY(EditAnywhere, Category = "Widget")
-	//	FText Name;
-
-	//UPROPERTY(EditAnywhere, Category = "Widget")
-	//	FText Description;
-};
 
 UCLASS()
 class DEMO_API UAbilityComponent : public UAbilitySystemComponent
@@ -50,11 +21,11 @@ public:
 	UAbilityComponent();
 protected:
 	virtual void BeginPlay() override;
-	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 public:
 
 	//property
 private:
+	ATurnBasedCharacter* Target;
 protected:
 public:
 
@@ -69,6 +40,9 @@ public:
 	float GetPower() const;
 	float GetSpeed() const;
 	float GetTurnGauge() const;
+
+	FORCEINLINE void SetTarget(ATurnBasedCharacter* InTarget) { Target = InTarget; }
+	FORCEINLINE ATurnBasedCharacter* GetTarget() const { return Target; }
 };
 
 

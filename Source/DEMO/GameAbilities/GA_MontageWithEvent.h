@@ -10,6 +10,30 @@
  * 
  */
 
+USTRUCT(BlueprintType)
+struct FGameAbilityMontageData
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(EditAnywhere, Category = "Data")
+		float StartDelay;
+
+	UPROPERTY(EditAnywhere, Category = "Data")
+		UAnimMontage* KeyMontage;
+
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<UAnimMontage*> SubMontages;
+
+	UPROPERTY(EditAnywhere, Category = "Data")
+		float PlayRate = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Data")
+		FName StartSection;
+
+	UPROPERTY(EditAnywhere, Category = "Data")
+		FName RepeatSection;
+};
+
 UCLASS()
 class DEMO_API UGA_MontageWithEvent : public UGA_BaseAbility
 {
@@ -23,24 +47,24 @@ public:
 	//property
 private:
 protected:
-	UPROPERTY(EditAnywhere, Category = "Montage")
-		UAnimMontage* Montage;
-
-	UPROPERTY(EditAnywhere, Category = "Montage")
-		float PlayRate = 1.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Montage")
-		FName StartSection;
-
-	UPROPERTY(EditAnywhere, Category = "Montage")
-		FName RepeatSection;
+	int32 MontageDataIdx;
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<FGameAbilityMontageData> MontageDatas;
 public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextMontageTriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextCameraMoveTriggerTag;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag EndTag;
 
 	//function
 private:
 protected:
+	virtual void PlayKeyMontage();
+	virtual void PlaySubMontages();
 	UFUNCTION()virtual void OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void OnCompleted(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData);

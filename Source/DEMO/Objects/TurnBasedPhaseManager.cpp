@@ -7,9 +7,12 @@
 
 #include "Characters/TurnBasedCharacter.h"
 #include "Characters/TurnBasedCharacterData.h"
+
 #include "Datas/TurnBasedDataTypes.h"
+
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
+#include "GameAbilities/GA_Skill.h"
 
 #include "Objects/SelectWidgetActor.h"
 #include "Objects/TurnbasedPhaseCamera.h"
@@ -54,6 +57,7 @@ void ATurnBasedPhaseManager::SpawnSelectTarget()
 	TFunction<void(ATurnBasedCharacter*)>func = [this](ATurnBasedCharacter* InCharacter)
 	{
 		FRotator lookat = UKismetMathLibrary::FindLookAtRotation(Camera->GetActorLocation(), InCharacter->GetActorLocation());
+		//UNDONE GCN으로 교체하기
 		Camera->SetTargetRotation(lookat);
 	};
 	selectTarget->SetOwningActor(SelectTarget);
@@ -184,11 +188,6 @@ void ATurnBasedPhaseManager::FindNextTurn()
 
 void ATurnBasedPhaseManager::FocusSelectSkill()
 {
-	//
-	// 카메라 위치 이동 시키기(CurrentTurnCharacter의 selectskill 위치로 카메라 이동)
-	// 위젯인풋이 먹히는지?
-	//
-
 	Camera->FocusSelectSkill(CurrentTurnCharacter);
 	SelectSkill->SetActorTransform(CurrentTurnCharacter->GetSelectSkillTransform());
 	SelectSkill->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
@@ -215,9 +214,16 @@ void ATurnBasedPhaseManager::FocusSelectTarget()
 
 void ATurnBasedPhaseManager::PlaySequence()
 {
-	//
-	// 어떤스킬? 어떤타겟? ㅇㅋ 재생할게요
-	//
+	UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
+	TArray<FGameplayAbilitySpec>& abilities = asc->GetActivatableAbilities();
+	for (auto& ability : abilities)
+	{
+		if (!ability.Ability->AbilityTags.HasTagExact(CurrentSelectedSkillTag))
+			continue;
+		asc->SetTarget(TargetCharacter);
+		asc->TryActivateAbility(ability.Handle);
+		break;
+	}
 }
 
 void ATurnBasedPhaseManager::EndTurn()
@@ -235,6 +241,7 @@ void ATurnBasedPhaseManager::ConfirmSkill(FGameplayTag InSkillTag)
 	//UNDONE
 	SelectSkill->Hide();
 	FocusSelectTarget();
+	CurrentSelectedSkillTag = InSkillTag;
 }
 
 void ATurnBasedPhaseManager::ConfirmTarget(ATurnBasedCharacter* InTarget)
