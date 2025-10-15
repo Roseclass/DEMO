@@ -47,6 +47,8 @@ private:
 	TMap<FGameplayTag, int32> SpawnRequestCountMap;
 	TMap<uint8, TArray<UTurnBasedCharacterData*>> PendingSpawnMap; 
 	TMap<uint8, TSet<ATurnBasedCharacter*>> SpawnedCharacterMap;
+	TArray<ATurnBasedCharacter*> PendingDeadArray;
+	TSet<ATurnBasedCharacter*> HandledDeadSet;
 	TArray<ATurnBasedCharacter*> LocationArray[2];
 protected:
 public:
@@ -64,10 +66,20 @@ private:
 	void FocusSelectSkill();
 	void FocusSelectTarget();
 	void PlaySequence();
-	void EndTurn();
+	UFUNCTION()void EndTurn();
 
 	UFUNCTION()void ConfirmTarget(ATurnBasedCharacter* InTarget);
 	void ConfirmSkill(FGameplayTag InSkillTag);
+
+	void FindDeadCharacter();
+	UFUNCTION()void HandleDeadCharacter();
+
+	bool IsPlayerVictory();
+	void HandlePlayerVictory();
+
+	bool IsPlayerDefeat();
+	void HandlePlayerDefeat();
+
 protected:
 public:
 	void SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData);

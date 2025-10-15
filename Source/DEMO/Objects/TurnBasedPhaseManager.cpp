@@ -104,6 +104,8 @@ void ATurnBasedPhaseManager::SpawnCharacter(uint8 TeamID, UTurnBasedCharacterDat
 	ch->Init(FGuid(), InData);
 	ch->SetGenericTeamId(TeamID);
 	SpawnedCharacterMap.FindOrAdd(TeamID).Add(ch);
+	UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
+	asc->OnSkillEnd.AddUFunction(this, "EndTurn");
 }
 
 void ATurnBasedPhaseManager::PlaceActorsOnField()
@@ -228,12 +230,8 @@ void ATurnBasedPhaseManager::PlaySequence()
 
 void ATurnBasedPhaseManager::EndTurn()
 {
-	//
-	// 혹시 누구 죽음? - 죽음 재생
-	// 혹시 플레이어 이김? - 승리 후 tps필드로
-	// 혹시 플레이어 짐? - 패배 후 어디로? 메인? 최근 저장된곳?
-	// 엥 안끝났어? - findnextturn
-	//
+	CLog::Print("ATurnBasedPhaseManager::EndTurn()");
+	FindDeadCharacter();
 }
 
 void ATurnBasedPhaseManager::ConfirmSkill(FGameplayTag InSkillTag)
@@ -249,6 +247,76 @@ void ATurnBasedPhaseManager::ConfirmTarget(ATurnBasedCharacter* InTarget)
 	SelectTarget->Hide();
 	TargetCharacter = InTarget;
 	PlaySequence();
+}
+
+void ATurnBasedPhaseManager::FindDeadCharacter()
+{
+	for (auto& i : SpawnedCharacterMap)
+	{
+		for (auto& ch : i.Value)
+		{
+			UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
+			float hp = asc->GetHealth();
+			if (hp <= 1e-9 && !HandledDeadSet.Contains(ch))
+				PendingDeadArray.Add(ch);
+		}
+	}
+	HandleDeadCharacter();
+}
+
+void ATurnBasedPhaseManager::HandleDeadCharacter()
+{
+	/*
+	* pending array에 있는 시퀀스 반복 재생
+	*/
+	if (PendingDeadArray.IsEmpty())
+	{
+		if (IsPlayerVictory())HandlePlayerVictory();
+		if (IsPlayerDefeat())HandlePlayerDefeat();
+		FindNextTurn();
+	}
+	else
+	{
+		UAbilityComponent* asc = Cast<UAbilityComponent>(PendingDeadArray[PendingDeadArray.Num() - 1]->GetAbilitySystemComponent());
+		asc->OnDeadSequenceEnd.AddUFunction(this, "HandleDeadCharacter");
+		asc->PlayDeadSequence();
+	}
+}
+
+bool ATurnBasedPhaseManager::IsPlayerVictory()
+{
+	const TSet<ATurnBasedCharacter*>& set = SpawnedCharacterMap[TEAMID_ENEMY];
+
+	for (auto ch : set)
+		if (!HandledDeadSet.Contains(ch))return 0;
+	return 1;
+}
+
+void ATurnBasedPhaseManager::HandlePlayerVictory()
+{
+	/*
+	* 승리 후 tps필드로
+	*/
+
+	// ui 팝업에 tps필드 이동을 달아놓자
+}
+
+bool ATurnBasedPhaseManager::IsPlayerDefeat()
+{
+	const TSet<ATurnBasedCharacter*>& set = SpawnedCharacterMap[TEAMID_PLAYER];
+
+	for (auto ch : set)
+		if (!HandledDeadSet.Contains(ch))return 0;
+	return 1;
+}
+
+void ATurnBasedPhaseManager::HandlePlayerDefeat()
+{
+	/*
+	* 패배 후 어디로? 메인? 최근 저장된곳?
+	*/
+
+	// ui 팝업에 다음 페이즈 이동을 달아놓자
 }
 
 void ATurnBasedPhaseManager::SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData)

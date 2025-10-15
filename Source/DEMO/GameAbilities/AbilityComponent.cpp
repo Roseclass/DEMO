@@ -45,6 +45,28 @@ void UAbilityComponent::InitAttributes(const FAttributeInitialInfo* NewStats)
 	}
 }
 
+void UAbilityComponent::PlayDeadSequence()
+{
+	CLog::Print("PlayDeadSequence");
+}
+
+void UAbilityComponent::BroadcastOnSkillEnd()
+{
+	OnSkillEnd.Broadcast();
+}
+
+void UAbilityComponent::BroadcastOnDeadSequenceEnd()
+{
+	OnDeadSequenceEnd.Broadcast();
+}
+
+float UAbilityComponent::GetHealth() const
+{
+	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));
+
+	return attribute->GetHealth();
+}
+
 float UAbilityComponent::GetDefense() const
 {
 	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));

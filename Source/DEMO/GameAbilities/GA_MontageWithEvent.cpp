@@ -17,7 +17,7 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
 	MontageDataIdx = 0;
-
+	CameraMoveDataIdx = 0;
 	// 몽타주를 재생하고 이벤트를 기다린다
 	FTimerHandle WaitHandle;
 	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
@@ -44,6 +44,7 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 			MontageDataIdx++;
 
 		}), MontageDatas[MontageDataIdx].StartDelay, false);
+	ApplyCameraMove();
 }
 
 void UGA_MontageWithEvent::PlayKeyMontage()
@@ -57,6 +58,17 @@ void UGA_MontageWithEvent::PlaySubMontages()
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 	for(auto montage : MontageDatas[MontageDataIdx].SubMontages)
 		asc->PlayMontage(this, GetCurrentActivationInfo(), montage, MontageDatas[MontageDataIdx].PlayRate, MontageDatas[MontageDataIdx].StartSection);
+}
+
+void UGA_MontageWithEvent::ApplyCameraMove()
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
+	gameplayCueParameters.EffectContext.AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
+
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);
 }
 
 void UGA_MontageWithEvent::OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData)

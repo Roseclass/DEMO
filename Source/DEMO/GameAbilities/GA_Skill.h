@@ -4,7 +4,6 @@
 #include "GameAbilities/GA_MontageWithEvent.h"
 #include "Engine/DataAsset.h"
 #include "GameAbilities/AbilityUIEnums.h"
-#include "GameAbilities/GameplayEffectContexts.h"
 #include "GA_Skill.generated.h"
 
 /**
@@ -52,10 +51,6 @@ public:
 	//property
 private:
 protected:
-	int32 CameraMoveDataIdx;
-	UPROPERTY(EditAnywhere, Category = "Data")
-		TArray<FCameraMoveEffectContext> CameraMoveDatas;
-
 	int32 DamageDealerDataIdx;
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FSpawnDamageDealerContext> DamageDealerDatas;
@@ -88,7 +83,6 @@ public:
 private:
 protected:
 	virtual void SpawnDamageDealer();
-	virtual void ApplyCameraMove();
 	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
 
 	virtual float GetCooldown(const FGameplayAbilityActorInfo* ActorInfo)const;

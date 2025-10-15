@@ -1,9 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameAbilities/GA_BaseAbility.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "GA_MontageWithEvent.generated.h"
 
 /**
@@ -50,6 +49,11 @@ protected:
 	int32 MontageDataIdx;
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FGameAbilityMontageData> MontageDatas;
+
+	int32 CameraMoveDataIdx;
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<FCameraMoveEffectContext> CameraMoveDatas;
+
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag NextMontageTriggerTag;
@@ -65,6 +69,7 @@ private:
 protected:
 	virtual void PlayKeyMontage();
 	virtual void PlaySubMontages();
+	virtual void ApplyCameraMove();
 	UFUNCTION()virtual void OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void OnCompleted(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData);

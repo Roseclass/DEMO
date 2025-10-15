@@ -13,6 +13,8 @@ class UGA_BaseAbility;
 class ATurnBasedCharacter;
 struct FAttributeInitialInfo;
 
+DECLARE_MULTICAST_DELEGATE(FAbilityComponentSignature);
+
 UCLASS()
 class DEMO_API UAbilityComponent : public UAbilitySystemComponent
 {
@@ -28,6 +30,8 @@ private:
 	ATurnBasedCharacter* Target;
 protected:
 public:
+	FAbilityComponentSignature OnSkillEnd;
+	FAbilityComponentSignature OnDeadSequenceEnd;
 
 	//function
 private:
@@ -35,7 +39,11 @@ protected:
 public:
 	void InitGA(const TArray<FAbilitySpecInfo>& NewGAs);
 	void InitAttributes(const FAttributeInitialInfo* NewStats);
+	void PlayDeadSequence();
+	void BroadcastOnSkillEnd();
+	void BroadcastOnDeadSequenceEnd();
 
+	float GetHealth() const;
 	float GetDefense() const;
 	float GetPower() const;
 	float GetSpeed() const;

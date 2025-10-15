@@ -21,9 +21,7 @@ void UGA_Skill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const F
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	CameraMoveDataIdx = 0;
 	DamageDealerDataIdx = 0;
-	ApplyCameraMove();
 }
 
 float UGA_Skill::GetCooldownTimeRemaining(const FGameplayAbilityActorInfo* ActorInfo) const
@@ -158,23 +156,15 @@ void UGA_Skill::SpawnDamageDealer()
 	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
 }
 
-void UGA_Skill::ApplyCameraMove()
-{
-	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
-	FGameplayCueParameters gameplayCueParameters;
-
-	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
-	gameplayCueParameters.EffectContext.AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
-
-	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);
-}
-
 void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
 {
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+
 	// 몽타주는 어빌리티가 끝나도 계속 재생된다.
 	if (EventTag == EndTag)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		asc->BroadcastOnSkillEnd();
 		return;
 	}
 	else if (EventTag == NextMontageTriggerTag)
