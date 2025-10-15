@@ -1,4 +1,4 @@
-#include "DamageDealer.h"
+#include "Objects/DamageDealer.h"
 #include "Global.h"
 #include "Components/ShapeComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -8,7 +8,8 @@
 #include "GameplayEffectExecutionCalculation.h"
 #include "GameplayCueManager.h"
 
-#include "DEMOCharacter.h"
+#include "Characters/TurnBasedCharacter.h"
+
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/GameplayEffectContexts.h"
@@ -17,123 +18,190 @@
 ADamageDealer::ADamageDealer()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
 }
-
 void ADamageDealer::BeginPlay()
 {
 	Super::BeginPlay();
-	FindCollision();
+	Activate();
 }
 
 void ADamageDealer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-}
-
-void ADamageDealer::OnComponentBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{
-	CheckFalse(HasAuthority());
-
-	// already hit?
-	if (GetDamagedActors().Contains(OtherActor))return;
-
-	// overlap with DungeonCharacterBase
-	ADEMOCharacter* base = Cast<ADEMOCharacter>(OtherActor);
-	if (!base)return;
-
-	// is deadmode?
-	// UNDONE::이게 꼭 필요할까? 턴제라 다단히트 맞으면 중간에 죽을수도있지 그럼 시퀀스 안터트릴거야 ?
-	//UAbilityComponent* gasComp = CHelpers::GetComponent<UAbilityComponent>(OtherActor);
-	//if (!gasComp)return;
-	//if (gasComp->IsDead())return;
-
-	// ignore alliance
-	CheckTrue(base->GetGenericTeamId() == TeamID);
-
-	// set properties
-	OverlappedActors.AddUnique(OtherActor);
-	CurrentOverlappedActor = OtherActor;
-
-	// send Damage
-	if (OtherActor && OtherActor != this)
-		SendDamage(GamePlayEffectClass, OtherActor, SweepResult);
-}
-
-void ADamageDealer::OnComponentEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	CheckFalse(HasAuthority());
-
-	// set properties
-	OverlappedActors.Remove(OtherActor);
-	if (CurrentOverlappedActor == OtherActor && OverlappedActors.Num())
-		CurrentOverlappedActor = OverlappedActors.Last();
-}
-
-void ADamageDealer::ResetDamagedActors()
-{
-	// reset property
-	DamagedActors.Empty();
-}
-
-void ADamageDealer::FindCollision()
-{
-	TArray<UShapeComponent*> shapeComponents;
-	GetComponents<UShapeComponent>(shapeComponents);
-	for (UShapeComponent* component : shapeComponents)
-	{
-		for (auto i : component->ComponentTags)
-		{
-			if (i == OverlapComponentTag)
-			{
-				CollisionComponents.Add(component);
-				break;
-			}
-		}
-	}
-	for (UShapeComponent* component : CollisionComponents)
-	{
-		component->OnComponentBeginOverlap.Clear();
-		component->OnComponentEndOverlap.Clear();
-		component->OnComponentBeginOverlap.AddDynamic(this, &ADamageDealer::OnComponentBeginOverlap);
-		component->OnComponentEndOverlap.AddDynamic(this, &ADamageDealer::OnComponentEndOverlap);
-	}
 }
 
 void ADamageDealer::SendDamage(TSubclassOf<UGameplayEffect> EffectClass, AActor* Target, const FHitResult& SweepResult)
 {
-	// TEST::데미지텍스트 트리거
+	CheckTrue(MaxHitCount <= CurrentHitCount);
+
+	SendEvent(GetDataContext().DamageSendTriggerDatas, bSendDamageEvent);
+
 	IAbilitySystemInterface* hitCharacter = Cast<IAbilitySystemInterface>(Target);
 	if (hitCharacter)
 	{
 		// Get asc
-		ADEMOCharacter* owner = Cast<ADEMOCharacter>(GetOwner());
+		ATurnBasedCharacter* owner = Cast<ATurnBasedCharacter>(GetOwner());
 		UAbilityComponent* hitASC = Cast<UAbilityComponent>(hitCharacter->GetAbilitySystemComponent());
 		UAbilityComponent* instigatorASC = Cast<UAbilityComponent>(owner->GetAbilitySystemComponent());
 		if (hitASC && instigatorASC && EffectClass)
 		{
 			// Make effectcontext handle
 			FDamageEffectContext* context = new FDamageEffectContext();
+			context->BaseDamage = CalculateDamage(instigatorASC->GetPower());
+			context->AddOrigin(Target->GetActorLocation());
+
 			FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 			EffectContextHandle.AddInstigator(owner ? owner->GetController() : nullptr, this);
 			EffectContextHandle.AddHitResult(SweepResult);
-			context->BaseDamage = CalculateDamage(instigatorASC->GetPower());
-			context->AddOrigin(Target->GetActorLocation());
 
 			// Must use EffectToTarget for auto mmc
 			instigatorASC->ApplyGameplayEffectToTarget(EffectClass.GetDefaultObject(), hitASC, UGameplayEffect::INVALID_LEVEL, EffectContextHandle);
 		}
-		CurrentDamagedActor = Target;
 	}
+	if (MaxHitCount <= ++CurrentHitCount)
+		Deactivate();
 }
 
 void ADamageDealer::Activate()
 {
-	bAct = 1;
+	FTimerDelegate func =
+		FTimerDelegate::CreateLambda([&]()
+			{
+				bAct = 1;
+				SendEvent(GetDataContext().ActivateTriggerDatas, bActivateEvent);
+			});
+	if (ActivateDelay <= 1e-9)
+	{
+		func.Execute();
+		return;
+	}
+	FTimerHandle activateHandle;
+	GetWorld()->GetTimerManager().SetTimer(activateHandle, func, ActivateDelay, false);
+}
+
+void ADamageDealer::ApplyNextCameraMove()
+{
+	bApplyNextCameraMove = 1;
+}
+
+void ADamageDealer::PlayNextMontage()
+{
+	bPlayNextMontage = 1;
+}
+
+void ADamageDealer::SpawnNextDamageDealer()
+{
+	bSpawnNextDamageDealer = 1;
 }
 
 void ADamageDealer::Deactivate()
 {
-	bAct = 0;
+	SendEvent(GetDataContext().DeactivateTriggerDatas, bDeactivateEvent);
+
+	//deactivate
+	{
+		FTimerDelegate func =
+			FTimerDelegate::CreateLambda([&]()
+				{
+					bAct = 0;
+					TryDestroy();
+				});
+		if (DeactivateDelay <= 1e-9)func.Execute();
+		else
+		{
+			FTimerHandle handle;
+			GetWorld()->GetTimerManager().SetTimer(handle, func, DeactivateDelay, false);
+		}
+	}
+
+	//applyNextCameraMove
+	{
+		FTimerDelegate func =
+			FTimerDelegate::CreateLambda([&]()
+				{
+					ApplyNextCameraMove();
+					TryDestroy();
+				});
+		if (CameraMoveDelay <= 1e-9)func.Execute();
+		else
+		{
+			FTimerHandle handle;
+			GetWorld()->GetTimerManager().SetTimer(handle, func, CameraMoveDelay, false);
+		}
+	}
+
+	//playNextMontage
+	{
+		FTimerDelegate func =
+			FTimerDelegate::CreateLambda([&]()
+				{
+					PlayNextMontage();
+					TryDestroy();
+				});
+		if (MontageDelay <= 1e-9)func.Execute();
+		else
+		{
+			FTimerHandle handle;
+			GetWorld()->GetTimerManager().SetTimer(handle, func, MontageDelay, false);
+		}
+	}
+
+	//spawnNextDamageDealer
+	{
+		FTimerDelegate func =
+			FTimerDelegate::CreateLambda([&]()
+				{
+					SpawnNextDamageDealer();
+					TryDestroy();
+				});
+		if (SpawnDamageDealerDelay <= 1e-9)func.Execute();
+		else
+		{
+			FTimerHandle handle;
+			GetWorld()->GetTimerManager().SetTimer(handle, func, SpawnDamageDealerDelay, false);
+		}
+	}
+}
+
+bool ADamageDealer::TryDestroy()
+{
+	if (bAct)return 0;
+	if (!bApplyNextCameraMove)return 0;
+	if (!bPlayNextMontage)return 0;
+	if (!bSpawnNextDamageDealer)return 0;
+	Destroy();
+	return 1;
+}
+
+void ADamageDealer::SendEvent(const TArray<FDamageDealerTriggerData>& InDatas, bool& InFlag)
+{
+	CheckTrue(InFlag);
+	
+	for (const auto& i : InDatas)
+	{
+		FTimerDelegate func = 
+		FTimerDelegate::CreateLambda([&]()
+			{
+				ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(Data.GetInstigator());
+				FGameplayEventData data;
+				instigator->GetAbilitySystemComponent()->HandleGameplayEvent(i.Tag, &data);
+			});
+		if (i.Delay <= 1e-9)
+		{
+			func.Execute();
+			continue;
+		}
+		FTimerHandle spawnNextDamageDealerHandle;
+		GetWorld()->GetTimerManager().SetTimer(spawnNextDamageDealerHandle, func, i.Delay, false);
+	}
+	InFlag = 1;
+}
+
+void ADamageDealer::Init(const FSpawnDamageDealerContext* InData)
+{
+	bApplyNextCameraMove = !bUseDeactivateCameraMove;
+	bPlayNextMontage = !bUseDeactivateMontage;
+	bSpawnNextDamageDealer = !bUseDeactivateSpawnDamageDealer;
+
+	Data = *InData;
 }

@@ -5,6 +5,7 @@
 #include "UObject/Object.h"
 #include "UObject/Class.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayTagContainer.h"
 #include "GameplayEffectContexts.generated.h"
 
 /**
@@ -18,7 +19,7 @@ enum class ECameraReturnType : uint8
 {
     NONE,
     Prev,
-    Initital,
+    Initial,
     MAX UMETA(Hidden)
 };
 
@@ -103,7 +104,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|Location", meta = (DisplayName = "Location", EditCondition = "CameraMoveType == ECameraMoveType::StartToGoal", EditConditionHides))
         FVector StartLocation;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|Location", meta = (DisplayName = "Location", EditCondition = "CameraMoveType > ECameraMoveType::SplineLocation && CameraMoveType < ECameraMoveType::Target", EditConditionHides))
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|Location", meta = (DisplayName = "Location", EditCondition = "CameraMoveType == ECameraMoveType::CurrentToGoal || CameraMoveType == ECameraMoveType::StartToGoal", EditConditionHides))
         FVector Location;
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|Location", meta = (DisplayName = "Offset"))
@@ -119,11 +120,75 @@ public:
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|LookAt", meta = (DisplayName = "Location", EditCondition = "CameraLookAtType == ECameraLookAtType::StartToGoal", EditConditionHides))
         FVector StartLookAtLocation;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|LookAt", meta = (DisplayName = "Location", EditCondition = "CameraLookAtType > ECameraLookAtType::SplineLocation && CameraLookAtType < ECameraLookAtType::Target", EditConditionHides))
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|LookAt", meta = (DisplayName = "Location", EditCondition = "CameraLookAtType == ECameraLookAtType::CurrentToGoal && CameraLookAtType == ECameraLookAtType::StartToGoal", EditConditionHides))
         FVector LookAtLocation;
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Data|LookAt", meta = (DisplayName = "Offset"))
         FVector LookAtOffset;
+};
+
+class ADamageDealer;
+
+USTRUCT(BlueprintType)
+struct FDamageDealerTriggerData
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float Delay;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        FGameplayTag Tag;
+};
+
+USTRUCT(BlueprintType)
+struct FSpawnDamageDealerContext : public FGameplayEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FSpawnDamageDealerContext* Duplicate() const override
+    {
+        FSpawnDamageDealerContext* NewContext = new FSpawnDamageDealerContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    TWeakObjectPtr<AActor> TargetActor;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TSubclassOf<ADamageDealer> Class;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        FName SocketName;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> ActivateTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> CollisionTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> DamageSendTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> DeactivateTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        bool bUseSocketLocation = 1;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float FrontDist;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float RightDist;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float UpDist;
 };
 
 USTRUCT(BlueprintType)

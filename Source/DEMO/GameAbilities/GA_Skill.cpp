@@ -14,6 +14,7 @@
 UGA_Skill::UGA_Skill()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	NextDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
 }
 
 void UGA_Skill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -146,41 +147,15 @@ void UGA_Skill::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGamepl
 
 void UGA_Skill::SpawnDamageDealer()
 {
-	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(GetAvatarActorFromActorInfo());
-	if (!ch)
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
 
-	UAbilityComponent* ASC = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
-	if (!ASC)
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	FSpawnDamageDealerContext* context = DamageDealerDatas[DamageDealerDataIdx++].Duplicate();
+	context->AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
+	context->TargetActor = asc->GetTarget();
 
-	//FTransform transform = ch->GetMesh()->GetSocketTransform(DamageDealerDataMap[EventTag].SocketName);
-	//transform.SetScale3D(FVector(1.0f));
-	//if (!DamageDealerDataMap[EventTag].bUseSocketLocation)
-	//{
-	//	FVector loc = ch->GetActorLocation();
-	//	loc += ch->GetActorForwardVector() * DamageDealerDataMap[EventTag].FrontDist;
-	//	loc += ch->GetActorRightVector() * DamageDealerDataMap[EventTag].RightDist;
-	//	loc += ch->GetActorUpVector() * DamageDealerDataMap[EventTag].UpDist;
-	//	transform.SetTranslation(loc);
-	//}
-
-	//if (!DamageDealerDataMap[EventTag].bUseSocketRotation)
-	//{
-	//	FRotator rot = ch->GetActorRotation();
-	//	transform.SetRotation(FQuat4d(rot + DamageDealerDataMap[EventTag].Rotation));
-	//}
-
-	//TODO::TEST
-	//FSkillEhancementData data = skill->GetEhancementData(AbilityTags.First());
-	//ADamageDealer* dealer = GetWorld()->SpawnActorDeferred<ADamageDealer>(DamageDealerDataMap[EventTag].Class, transform, GetOwningActorFromActorInfo(),
-	//	ch, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-	//dealer->SetOwner(ch);
-	//dealer->SetTeamID(ch->GetGenericTeamId());
-	////dealer->SetDamageAdditive(data.DamageAdditive);
-	////dealer->SetDamageMultiplicitive(data.DamageMultiplicitive);
-	//dealer->Activate();
-	//dealer->FinishSpawning(transform);
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
 }
 
 void UGA_Skill::ApplyCameraMove()

@@ -15,36 +15,6 @@ class UAnimMontage;
 class ADamageDealer;
 
 USTRUCT(BlueprintType)
-struct FDamageDealerData
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(EditAnywhere)
-		TSubclassOf<ADamageDealer> Class;
-
-	UPROPERTY(EditAnywhere)
-		FName SocketName;
-
-	UPROPERTY(EditAnywhere)
-		bool bUseSocketLocation = 1;
-
-	UPROPERTY(EditAnywhere)
-		bool bUseSocketRotation = 0;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-		float FrontDist;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-		float RightDist;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-		float UpDist;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition = "!bUseSocketRotation", EditConditionHides))
-		FRotator Rotation;
-};
-
-USTRUCT(BlueprintType)
 struct FDamageEhancementData
 {
 	GENERATED_BODY()
@@ -88,7 +58,7 @@ protected:
 
 	int32 DamageDealerDataIdx;
 	UPROPERTY(EditAnywhere, Category = "Data")
-		TArray<FDamageDealerData> DamageDealerDatas;
+		TArray<FSpawnDamageDealerContext> DamageDealerDatas;
 
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Data")
 		FDamageEhancementData DamageData;

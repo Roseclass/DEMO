@@ -7,7 +7,9 @@
 
 UGA_MontageWithEvent::UGA_MontageWithEvent()
 {
-
+	EndTag = FGameplayTag::RequestGameplayTag("Skill.System.End");
+	NextCameraMoveTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextCameraMove");
+	NextMontageTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextMontage");
 }
 
 void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
