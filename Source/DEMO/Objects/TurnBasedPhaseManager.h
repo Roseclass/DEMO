@@ -36,10 +36,10 @@ private:
 	FTurnBasedFieldLayoutRow* LevelData;
 
 	ATurnbasedPhaseCamera* Camera;
-	TSubclassOf<ASelectWidgetActor>SelectTargetClass;
-	ASelectWidgetActor* SelectTarget;
-	TSubclassOf<ASelectWidgetActor>SelectSkillClass;
-	ASelectWidgetActor* SelectSkill;
+	ASelectWidgetActor* SelectWidgetActor;
+	TSubclassOf<ASelectWidgetActor>SelectWidgetActorClass;
+	ASelectWidgetActor* SelectTargetCursorActor;
+	TSubclassOf<ASelectWidgetActor>SelectTargetCursorActorClass;
 	FGameplayTag CurrentSelectedSkillTag;
 	ATurnBasedCharacter* CurrentTurnCharacter;
 	ATurnBasedCharacter* TargetCharacter;
@@ -56,20 +56,17 @@ public:
 	//function
 private:
 	void SpawnCamera();
-	void SpawnSelectTarget();
-	void SpawnSelectSkill();
+	void SpawnSelectWidget();
 	void TrySpawnCharacter();
 	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 	void PlaceActorsOnField();
 
 	void FindNextTurn();
-	void FocusSelectSkill();
-	void FocusSelectTarget();
+	void FocusSelect();
 	void PlaySequence();
 	UFUNCTION()void EndTurn();
 
-	UFUNCTION()void ConfirmTarget(ATurnBasedCharacter* InTarget);
-	void ConfirmSkill(FGameplayTag InSkillTag);
+	UFUNCTION()void ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget);
 
 	void FindDeadCharacter();
 	UFUNCTION()void HandleDeadCharacter();

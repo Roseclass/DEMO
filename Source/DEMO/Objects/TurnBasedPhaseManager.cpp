@@ -17,22 +17,20 @@
 #include "Objects/SelectWidgetActor.h"
 #include "Objects/TurnbasedPhaseCamera.h"
 
-#include "Widgets/UW_SelectTarget.h"
-#include "Widgets/UW_SelectSkill.h"
+#include "Widgets/UW_TurnBased_Select.h"
 
 ATurnBasedPhaseManager::ATurnBasedPhaseManager()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	CHelpers::GetClass<ASelectWidgetActor>(&SelectTargetClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectTarget.BP_SelectTarget_C'");
-	CHelpers::GetClass<ASelectWidgetActor>(&SelectSkillClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectSkill.BP_SelectSkill_C'");
+	CHelpers::GetClass<ASelectWidgetActor>(&SelectWidgetActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectSkill.BP_SelectSkill_C'");
+	CHelpers::GetClass<ASelectWidgetActor>(&SelectTargetCursorActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectTarget.BP_SelectTarget_C'");
 }
 
 void ATurnBasedPhaseManager::BeginPlay()
 {
 	Super::BeginPlay();
 	SpawnCamera();
-	SpawnSelectTarget();
-	SpawnSelectSkill();
+	SpawnSelectWidget();
 }
 
 void ATurnBasedPhaseManager::Tick(float DeltaTime)
@@ -50,35 +48,32 @@ void ATurnBasedPhaseManager::SpawnCamera()
 	pc->SetViewTargetWithBlend(Camera);
 }
 
-void ATurnBasedPhaseManager::SpawnSelectTarget()
+void ATurnBasedPhaseManager::SpawnSelectWidget()
 {
-	SelectTarget = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectTargetClass, FTransform(), this);
-	UUW_SelectTarget* selectTarget = Cast<UUW_SelectTarget>(SelectTarget->GetWidgetObject());
-	TFunction<void(ATurnBasedCharacter*)>func = [this](ATurnBasedCharacter* InCharacter)
+	SelectWidgetActor = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectWidgetActorClass, FTransform(), this);
+	UUW_TurnBased_Select* select = Cast<UUW_TurnBased_Select>(SelectWidgetActor->GetWidgetObject());
+	TFunction<void(FGameplayTag, ATurnBasedCharacter*)>func = [this](FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget)
+	{
+		this->ConfirmSelect(InSkillTag, InTarget);
+	};
+	select->OnConfirm.AddLambda(func);
+
+	SelectTargetCursorActor = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectTargetCursorActorClass, FTransform(), this);
+	
+	TFunction<void(ATurnBasedCharacter*)>func1 = [this](ATurnBasedCharacter* InCharacter)
 	{
 		FRotator lookat = UKismetMathLibrary::FindLookAtRotation(Camera->GetActorLocation(), InCharacter->GetActorLocation());
-		//UNDONE GCN으로 교체하기
 		Camera->SetTargetRotation(lookat);
 	};
-	selectTarget->SetOwningActor(SelectTarget);
-	selectTarget->OnMoveDown.AddLambda(func);
-	selectTarget->OnConfirmDown.AddUFunction(this, "ConfirmTarget");
+
+	select->SetTargetCursorActor(SelectTargetCursorActor);
+	select->OnHorizontalMove.AddLambda(func1);
+
 	TFunction<bool()>func2 = [this]()
 	{
 		return !Camera->IsRotating();
 	};
-	selectTarget->OnCanSelectTargetKeyDown.BindLambda(func2);
-}
-
-void ATurnBasedPhaseManager::SpawnSelectSkill()
-{
-	SelectSkill = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectSkillClass, FTransform(), this);
-	UUW_SelectSkill* selectSkill = Cast<UUW_SelectSkill>(SelectSkill->GetWidgetObject());
-	TFunction<void(FGameplayTag)>func = [this](FGameplayTag InSkillTag)
-	{
-		this->ConfirmSkill(InSkillTag);
-	};
-	selectSkill->OnConfirmDown.AddLambda(func);
+	select->CanAcceptKey.BindLambda(func2);
 }
 
 void ATurnBasedPhaseManager::TrySpawnCharacter()
@@ -185,33 +180,22 @@ void ATurnBasedPhaseManager::FindNextTurn()
 	Next.Sort();
 	CurrentTurnCharacter = Next[Next.Num() - 1].Value;
 
-	FocusSelectSkill();
+	FocusSelect();
 }
 
-void ATurnBasedPhaseManager::FocusSelectSkill()
+void ATurnBasedPhaseManager::FocusSelect()
 {
 	Camera->FocusSelectSkill(CurrentTurnCharacter);
-	SelectSkill->SetActorTransform(CurrentTurnCharacter->GetSelectSkillTransform());
-	SelectSkill->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
+	SelectWidgetActor->SetActorTransform(CurrentTurnCharacter->GetSelectSkillTransform());
+	SelectWidgetActor->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
 
-	UUW_SelectSkill* selectSkill = Cast<UUW_SelectSkill>(SelectSkill->GetWidgetObject());
-
-	selectSkill->Activate(CurrentTurnCharacter);
-
-	SelectSkill->Show();
-}
-
-void ATurnBasedPhaseManager::FocusSelectTarget()
-{
+	UUW_TurnBased_Select* select = Cast<UUW_TurnBased_Select>(SelectWidgetActor->GetWidgetObject());
 	int32 targetID = CurrentTurnCharacter->GetGenericTeamId() == TEAMID_PLAYER ? TEAMID_ENEMY : TEAMID_PLAYER;
 
-	Camera->FocusSelectTarget();
 
-	UUW_SelectTarget* selectTarget = Cast<UUW_SelectTarget>(SelectTarget->GetWidgetObject());
-
-	selectTarget->Activate(LocationArray[targetID]);
-
-	SelectTarget->Show();
+	select->Activate(CurrentTurnCharacter, LocationArray[targetID]);
+	SelectWidgetActor->Show();
+	SelectTargetCursorActor->Show();
 }
 
 void ATurnBasedPhaseManager::PlaySequence()
@@ -234,17 +218,11 @@ void ATurnBasedPhaseManager::EndTurn()
 	FindDeadCharacter();
 }
 
-void ATurnBasedPhaseManager::ConfirmSkill(FGameplayTag InSkillTag)
+void ATurnBasedPhaseManager::ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget)
 {
-	//UNDONE
-	SelectSkill->Hide();
-	FocusSelectTarget();
+	SelectWidgetActor->Hide();
+	SelectTargetCursorActor->Hide();
 	CurrentSelectedSkillTag = InSkillTag;
-}
-
-void ATurnBasedPhaseManager::ConfirmTarget(ATurnBasedCharacter* InTarget)
-{
-	SelectTarget->Hide();
 	TargetCharacter = InTarget;
 	PlaySequence();
 }

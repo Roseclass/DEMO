@@ -62,6 +62,7 @@ void UGA_MontageWithEvent::PlaySubMontages()
 
 void UGA_MontageWithEvent::ApplyCameraMove()
 {
+	CheckTrue(CameraMoveDatas.IsEmpty());
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 	FGameplayCueParameters gameplayCueParameters;
 
