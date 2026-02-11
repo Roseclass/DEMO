@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
+#include "GameAbilities/GameplayEffectContexts.h"
+#include "GameAbilities/GameplayEffectPayloads.h"
 #include "TurnBasedPhaseManager.generated.h"
 
 /**
@@ -18,6 +20,17 @@ class ATurnBasedCharacter;
 class UTurnBasedCharacterData;
 class ASelectWidgetActor;
 
+UENUM()
+enum class EActionStage : uint8
+{
+	FindNextTurn,
+	FocusSelect,
+	PlaySequence,
+	EndTurn,
+	FindDeadCharacter,
+	HandleDeadCharacter,
+	MAX UMETA(meta = (Hidden))
+};
 
 UCLASS()
 class DEMO_API ATurnBasedPhaseManager : public AActor
@@ -34,6 +47,11 @@ public:
 	//property
 private:
 	FTurnBasedFieldLayoutRow* LevelData;
+
+	EActionStage CurrentStage = EActionStage::MAX;
+	EActionStage NextStage = EActionStage::MAX;
+
+	TMap<EReservedActionTiming, TArray<FPayloadContext>>ReservedActions;
 
 	ATurnbasedPhaseCamera* Camera;
 	ASelectWidgetActor* SelectWidgetActor;
@@ -60,7 +78,14 @@ private:
 	void TrySpawnCharacter();
 	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 	void PlaceActorsOnField();
+	void ReduceCooldown();
+	void HandleDoTDamage();
 
+	EReservedActionType ConsumeAfterCurrentAction();
+	EReservedActionType ConsumeStartOfNextTurn();
+	EReservedActionType ConsumeEndOfTurn();
+
+	UFUNCTION()void HandleStageTransition();
 	void FindNextTurn();
 	void FocusSelect();
 	void PlaySequence();
@@ -82,4 +107,11 @@ public:
 	void SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData);
 	void AddToSpawnMap(uint8 TeamID, TArray<FGameplayTag> InGameplayTags);
 	void RequestSpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
+
+public: // for subsystem
+	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
+	void ReserveAction(const FPayloadContext* InEffectContext);
+
+	const TSet<ATurnBasedCharacter*>& GetPlayerCharacters() const;
+	const TSet<ATurnBasedCharacter*>& GetEnemyCharacters() const;
 };

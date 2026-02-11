@@ -3,7 +3,12 @@
 
 #include "GameFramework/PlayerController.h"
 
+#include "DEMOGameInstance.h"
 #include "SaveLoadSubsystem.h"
+
+#include "Characters/AI/TurnBasedAIController.h"
+#include "Characters/AI/TurnBasedBehaviorComponent.h"
+#include "Characters/AI/TurnBasedEnemy.h"
 
 #include "Characters/TurnBasedCharacter.h"
 #include "Characters/TurnBasedCharacterData.h"
@@ -13,6 +18,7 @@
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/GA_Skill.h"
+#include "GameAbilities/GE_InstantDamage.h"
 
 #include "Objects/SelectWidgetActor.h"
 #include "Objects/TurnbasedPhaseCamera.h"
@@ -24,6 +30,10 @@ ATurnBasedPhaseManager::ATurnBasedPhaseManager()
 	PrimaryActorTick.bCanEverTick = true;
 	CHelpers::GetClass<ASelectWidgetActor>(&SelectWidgetActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectSkill.BP_SelectSkill_C'");
 	CHelpers::GetClass<ASelectWidgetActor>(&SelectTargetCursorActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectTarget.BP_SelectTarget_C'");
+
+	ReservedActions.FindOrAdd(EReservedActionTiming::AfterCurrentAction);
+	ReservedActions.FindOrAdd(EReservedActionTiming::StartOfNextTurn);
+	ReservedActions.FindOrAdd(EReservedActionTiming::EndOfTurn);
 }
 
 void ATurnBasedPhaseManager::BeginPlay()
@@ -36,6 +46,14 @@ void ATurnBasedPhaseManager::BeginPlay()
 void ATurnBasedPhaseManager::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	return;
+
+	if (CurrentTurnCharacter)
+	{
+		CLog::Print(CurrentTurnCharacter->GetName(), -1, 0, FColor::Emerald);
+		CurrentTurnCharacter->PrintAbilities();
+	}
 }
 
 void ATurnBasedPhaseManager::SpawnCamera()
@@ -94,13 +112,17 @@ void ATurnBasedPhaseManager::TrySpawnCharacter()
 void ATurnBasedPhaseManager::SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData)
 {
 	CheckNull(InData);
-	ATurnBasedCharacter* ch = GetWorld()->SpawnActorDeferred<ATurnBasedCharacter>(ATurnBasedCharacter::StaticClass(), FTransform(), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	ATurnBasedCharacter* ch = nullptr;
+	if(TeamID == TEAMID_PLAYER)ch = GetWorld()->SpawnActorDeferred<ATurnBasedCharacter>(ATurnBasedCharacter::StaticClass(), FTransform(), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	else if(TeamID == TEAMID_ENEMY)ch = GetWorld()->SpawnActorDeferred<ATurnBasedEnemy>(ATurnBasedEnemy::StaticClass(), FTransform(), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	CheckTrue_Print(!ch, "ch is nullptr");
 	UGameplayStatics::FinishSpawningActor(ch, FTransform());
 	ch->Init(FGuid(), InData);
 	ch->SetGenericTeamId(TeamID);
 	SpawnedCharacterMap.FindOrAdd(TeamID).Add(ch);
 	UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
 	asc->OnSkillEnd.AddUFunction(this, "EndTurn");
+	asc->OnDeadSequenceEnd.AddUFunction(this, "HandleDeadCharacter");
 }
 
 void ATurnBasedPhaseManager::PlaceActorsOnField()
@@ -144,78 +166,326 @@ void ATurnBasedPhaseManager::PlaceActorsOnField()
 	FindNextTurn();
 }
 
+void ATurnBasedPhaseManager::ReduceCooldown()
+{
+	//
+	// TODO::현재 턴인 캐릭터만 줄이는데 혹시라도 수정이 필요할수도?
+	//
+		
+	//공용 쿨타임 태그 중복 적용 방지
+	CheckTrue(CurrentTurnCharacter->IsDead());
+	UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
+	CheckTrue(!asc);
+
+	TSet<FGameplayTag> tagSet;
+
+	TArray<FGameplayAbilitySpecHandle> specHandles;
+	asc->GetAllAbilities(specHandles);
+	for (auto& specHandle : specHandles)
+	{
+		FGameplayAbilitySpec* spec = asc->FindAbilitySpecFromHandle(specHandle);
+		if (!spec->Ability->GetCooldownTags() ||
+			spec->Ability->GetCooldownTags()->IsEmpty())continue;
+		for (auto tag : *spec->Ability->GetCooldownTags())
+			tagSet.Add(tag);
+	}
+
+	CheckTrue(tagSet.IsEmpty());
+
+	FGameplayTagContainer tags;
+	for (auto tag : tagSet) tags.AddTag(tag);
+	FGameplayEffectQuery const query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(tags);
+	asc->RemoveActiveEffects(query, 1);
+}
+
+void ATurnBasedPhaseManager::HandleDoTDamage()
+{
+	//
+	// TODO::
+	//
+
+	CheckTrue(CurrentTurnCharacter->IsDead());
+	UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
+	CheckTrue(!asc);
+	
+	TArray<FGameplayEffectSpec> specs;
+	asc->GetAllActiveGameplayEffectSpecs(specs);
+	for (auto& spec : specs)
+	{
+		if (!spec.DynamicGrantedTags.HasTagExact(FGameplayTag::RequestGameplayTag("Effect.Damage.DoT")))continue;
+		const FDamageEffectContext* dotContext = static_cast<const FDamageEffectContext*>(spec.GetEffectContext().Get());
+		if (!dotContext)continue;
+
+		UAbilityComponent* instigatorASC = Cast<UAbilityComponent>(
+			Cast<ATurnBasedCharacter>(spec.GetEffectContext().GetInstigator())
+			->GetAbilitySystemComponent());
+		float damage = dotContext->CalculatedDamage;
+
+		FDamageEffectContext* context = new FDamageEffectContext();
+		context->CalculatedDamage = damage;
+		context->Location = CurrentTurnCharacter->GetActorLocation();
+
+		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
+		EffectContextHandle.AddInstigator(spec.GetEffectContext().GetInstigator(), this);
+
+
+		FGameplayEffectSpecHandle EffectSpecHandle = instigatorASC->MakeOutgoingSpec(UGE_InstantDamage::StaticClass(), 1, EffectContextHandle);
+		EffectSpecHandle.Data->SetByCallerNameMagnitudes.Add(FName("calculatedDamage"), -damage);
+
+		instigatorASC->ApplyGameplayEffectSpecToTarget(*EffectSpecHandle.Data, asc);
+
+		FGameplayTagContainer tags;
+		tags.AddTag(FGameplayTag::RequestGameplayTag("Effect.Damage.DoT"));
+		FGameplayEffectQuery const query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(tags);
+		asc->RemoveActiveEffects(query, 1);
+	}
+}
+
+EReservedActionType ATurnBasedPhaseManager::ConsumeAfterCurrentAction()
+{
+	if (ReservedActions[EReservedActionTiming::AfterCurrentAction].IsEmpty())
+		return EReservedActionType::MAX;
+
+	FPayloadContext context = ReservedActions[EReservedActionTiming::AfterCurrentAction][0];
+	ReservedActions[EReservedActionTiming::AfterCurrentAction].RemoveAt(0);
+	UDA_ActionReservation* payload = Cast<UDA_ActionReservation>(context.Payload);
+
+	if (!payload)
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() payload is nullptr", -1, 10, FColor::Red);
+		return EReservedActionType::MAX;
+	}
+
+	if (payload->Type == EReservedActionType::ExtraTurn)
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() Type is ExtraTurn", -1, 10, FColor::Red);
+		return EReservedActionType::MAX;
+	}
+	else if (payload->Type == EReservedActionType::ExtraHit)
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() Type is ExtraTurn", -1, 10, FColor::Red);
+		return EReservedActionType::ExtraHit;
+	}
+
+	return EReservedActionType::MAX;
+}
+
+EReservedActionType ATurnBasedPhaseManager::ConsumeStartOfNextTurn()
+{
+	if (ReservedActions[EReservedActionTiming::StartOfNextTurn].IsEmpty())
+		return EReservedActionType::MAX;
+
+	FPayloadContext context = ReservedActions[EReservedActionTiming::StartOfNextTurn][0];
+	ReservedActions[EReservedActionTiming::StartOfNextTurn].RemoveAt(0);
+	UDA_ActionReservation* payload = Cast<UDA_ActionReservation>(context.Payload);
+
+	if (!payload)
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() payload is nullptr", -1, 10, FColor::Red);
+		return EReservedActionType::MAX;
+	}
+
+	if (payload->Type == EReservedActionType::ExtraTurn)
+	{
+		if (payload->Target == EReservedActionTarget::EventCauser)
+			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.EventCauserActor.Get());
+		else if (payload->Target == EReservedActionTarget::EventTarget)
+			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.EventTargetActor.Get());
+		else if (payload->Target == EReservedActionTarget::RuleSource)
+			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.RuleSourceActor.Get());
+
+		if (!CurrentTurnCharacter)
+		{
+			CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() CurrentTurnCharacter is nullptr", -1, 10, FColor::Red);
+			return EReservedActionType::MAX;
+		}
+	}
+	else if (payload->Type == EReservedActionType::ExtraHit)
+	{
+
+	}
+
+	return payload->Type;
+}
+
+EReservedActionType ATurnBasedPhaseManager::ConsumeEndOfTurn()
+{
+	return EReservedActionType::MAX;
+}
+
+void ATurnBasedPhaseManager::HandleStageTransition()
+{
+	EReservedActionType reservation = ConsumeAfterCurrentAction();
+
+	// 예약된거 없음
+	if (reservation == EReservedActionType::MAX)
+	{
+
+	}
+	else if (reservation == EReservedActionType::ExtraHit)
+	{
+		// TODO::
+	}
+
+
+
+	if (NextStage == EActionStage::FindNextTurn)
+	{
+
+	}
+	else if (NextStage == EActionStage::FocusSelect)
+	{
+
+	}
+	else if (NextStage == EActionStage::PlaySequence)
+	{
+
+	}
+	else if (NextStage == EActionStage::EndTurn)
+	{
+		reservation = ConsumeEndOfTurn();
+		// 예약된거 없음
+		if (reservation == EReservedActionType::MAX)
+		{
+
+		}
+		else if (reservation == EReservedActionType::ExtraHit)
+		{
+			// TODO::
+		}
+	}
+	else if (NextStage == EActionStage::FindDeadCharacter)
+	{
+
+	}
+	else if (NextStage == EActionStage::HandleDeadCharacter)
+	{
+
+	}
+}
+
 void ATurnBasedPhaseManager::FindNextTurn()
 {
 	//
 	// 사이드위젯에 뒤에 순서가 어떻게되는지 스택해두기, 스피드 변경으로 순서바뀌면 gcn으로 터트리기?
 	//
 
-	TArray<TTuple<float, ATurnBasedCharacter*>>Next;
-	do
+	EReservedActionType reservation = ConsumeStartOfNextTurn();
+
+	// find current turn character
+	if (reservation == EReservedActionType::MAX)
 	{
-		for (auto tuple : SpawnedCharacterMap)
+		TArray<TTuple<float, ATurnBasedCharacter*>>Next;
+		do
 		{
-			for (auto& ch : tuple.Value)
+			for (auto tuple : SpawnedCharacterMap)
 			{
-				UAbilitySystemComponent* asc = ch->GetAbilitySystemComponent();
-				UGameplayEffect* GE = NewObject<UGameplayEffect>(this);
-				GE->DurationPolicy = EGameplayEffectDurationType::Instant;
+				for (auto& ch : tuple.Value)
+				{
+					if (ch->IsDead())continue;
+					UAbilitySystemComponent* asc = ch->GetAbilitySystemComponent();
+					UGameplayEffect* GE = NewObject<UGameplayEffect>(this);
+					GE->DurationPolicy = EGameplayEffectDurationType::Instant;
 
-				FGameplayModifierInfo Mod;
-				Mod.Attribute = UAttributeSet_Character::GetTurnGaugeAttribute();
-				Mod.ModifierOp = EGameplayModOp::Additive;
-				Mod.ModifierMagnitude = FScalableFloat(ch->GetSpeed());
-				GE->Modifiers.Add(Mod);
+					FGameplayModifierInfo Mod;
+					Mod.Attribute = UAttributeSet_Character::GetTurnGaugeAttribute();
+					Mod.ModifierOp = EGameplayModOp::Additive;
+					Mod.ModifierMagnitude = FScalableFloat(ch->GetSpeed());
+					GE->Modifiers.Add(Mod);
 
-				FGameplayEffectContextHandle context = asc->MakeEffectContext();
-				FGameplayEffectSpec Spec(GE, context);
+					FGameplayEffectContextHandle context = asc->MakeEffectContext();
+					FGameplayEffectSpec Spec(GE, context);
 
-				ch->GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(Spec);
-				float gauge = ch->GetTurnGauge();
-				if (100 <= gauge)Next.Add({ gauge,ch });
+					ch->GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(Spec);
+					float gauge = ch->GetTurnGauge();
+					if (100 <= gauge)Next.Add({ gauge,ch });
+				}
 			}
+		} while (Next.IsEmpty());
+
+		Next.Sort();
+		CurrentTurnCharacter = Next[Next.Num() - 1].Value;
+
+		// handle turngauge
+		{
+			UAbilitySystemComponent* asc = CurrentTurnCharacter->GetAbilitySystemComponent();
+			UGameplayEffect* GE = NewObject<UGameplayEffect>(this);
+			GE->DurationPolicy = EGameplayEffectDurationType::Instant;
+
+			FGameplayModifierInfo Mod;
+			Mod.Attribute = UAttributeSet_Character::GetTurnGaugeAttribute();
+			Mod.ModifierOp = EGameplayModOp::Additive;
+			Mod.ModifierMagnitude = FScalableFloat(-100);
+			GE->Modifiers.Add(Mod);
+
+			FGameplayEffectContextHandle context = asc->MakeEffectContext();
+			FGameplayEffectSpec Spec(GE, context);
+
+			CurrentTurnCharacter->GetAbilitySystemComponent()->ApplyGameplayEffectSpecToSelf(Spec);
 		}
-	} while (Next.IsEmpty());
+	}
+	else if (reservation == EReservedActionType::ExtraTurn)
+	{
+		// 뭐 딱히 할일은 없는거 같습니다만..
+	}
+	else if (reservation == EReservedActionType::ExtraHit)
+	{
+		// TODO::
+	}
 
-	Next.Sort();
-	CurrentTurnCharacter = Next[Next.Num() - 1].Value;
+	{
+		ReduceCooldown();
+		HandleDoTDamage();
+	}
 
-	FocusSelect();
+	//FocusSelect();
+	HandleStageTransition();
 }
 
 void ATurnBasedPhaseManager::FocusSelect()
 {
 	Camera->FocusSelectSkill(CurrentTurnCharacter);
-	SelectWidgetActor->SetActorTransform(CurrentTurnCharacter->GetSelectSkillTransform());
-	SelectWidgetActor->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
+	SelectWidgetActor->SetActorTransform(CurrentTurnCharacter->GetActorTransform());
+	//SelectWidgetActor->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
 
 	UUW_TurnBased_Select* select = Cast<UUW_TurnBased_Select>(SelectWidgetActor->GetWidgetObject());
 	int32 targetID = CurrentTurnCharacter->GetGenericTeamId() == TEAMID_PLAYER ? TEAMID_ENEMY : TEAMID_PLAYER;
 
-
 	select->Activate(CurrentTurnCharacter, LocationArray[targetID]);
 	SelectWidgetActor->Show();
 	SelectTargetCursorActor->Show();
+
+	if (CurrentTurnCharacter->IsA<ATurnBasedEnemy>())
+	{
+		UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(CurrentTurnCharacter->GetController());
+		behavior->SetWaitMode();
+	}
 }
 
 void ATurnBasedPhaseManager::PlaySequence()
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
 	TArray<FGameplayAbilitySpec>& abilities = asc->GetActivatableAbilities();
-	for (auto& ability : abilities)
+	for (auto& spec : abilities)
 	{
-		if (!ability.Ability->AbilityTags.HasTagExact(CurrentSelectedSkillTag))
+		if (!spec.Ability->AbilityTags.HasTagExact(CurrentSelectedSkillTag))
 			continue;
 		asc->SetTarget(TargetCharacter);
-		asc->TryActivateAbility(ability.Handle);
+		asc->TryActivateAbility(spec.Handle);
 		break;
 	}
 }
 
 void ATurnBasedPhaseManager::EndTurn()
 {
-	CLog::Print("ATurnBasedPhaseManager::EndTurn()");
-	FindDeadCharacter();
+	if (CurrentTurnCharacter->IsA<ATurnBasedEnemy>())
+	{
+		UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(CurrentTurnCharacter->GetController());
+		behavior->SetNotMyTurnMode();
+	}
+
+	//FindDeadCharacter();
+	HandleStageTransition();
 }
 
 void ATurnBasedPhaseManager::ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget)
@@ -224,7 +494,9 @@ void ATurnBasedPhaseManager::ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCh
 	SelectTargetCursorActor->Hide();
 	CurrentSelectedSkillTag = InSkillTag;
 	TargetCharacter = InTarget;
-	PlaySequence();
+
+	//PlaySequence();
+	HandleStageTransition();
 }
 
 void ATurnBasedPhaseManager::FindDeadCharacter()
@@ -233,13 +505,12 @@ void ATurnBasedPhaseManager::FindDeadCharacter()
 	{
 		for (auto& ch : i.Value)
 		{
-			UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
-			float hp = asc->GetHealth();
-			if (hp <= 1e-9 && !HandledDeadSet.Contains(ch))
+			if (ch->IsDead() && !HandledDeadSet.Contains(ch))
 				PendingDeadArray.Add(ch);
 		}
 	}
-	HandleDeadCharacter();
+	//HandleDeadCharacter();
+	HandleStageTransition();
 }
 
 void ATurnBasedPhaseManager::HandleDeadCharacter()
@@ -247,16 +518,28 @@ void ATurnBasedPhaseManager::HandleDeadCharacter()
 	/*
 	* pending array에 있는 시퀀스 반복 재생
 	*/
+
 	if (PendingDeadArray.IsEmpty())
 	{
-		if (IsPlayerVictory())HandlePlayerVictory();
-		if (IsPlayerDefeat())HandlePlayerDefeat();
-		FindNextTurn();
+		if (IsPlayerVictory())
+		{
+			HandlePlayerVictory();
+			return;
+		}
+		if (IsPlayerDefeat())
+		{
+			HandlePlayerDefeat();
+			return;
+		}
+		//FindNextTurn();
+		HandleStageTransition();
 	}
 	else
 	{
-		UAbilityComponent* asc = Cast<UAbilityComponent>(PendingDeadArray[PendingDeadArray.Num() - 1]->GetAbilitySystemComponent());
-		asc->OnDeadSequenceEnd.AddUFunction(this, "HandleDeadCharacter");
+		ATurnBasedCharacter* ch = PendingDeadArray[PendingDeadArray.Num() - 1];
+		PendingDeadArray.Remove(ch);
+		UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
+		HandledDeadSet.Add(ch);
 		asc->PlayDeadSequence();
 	}
 }
@@ -276,7 +559,22 @@ void ATurnBasedPhaseManager::HandlePlayerVictory()
 	* 승리 후 tps필드로
 	*/
 
+	//필드 정리하기
+	for (auto& tuple : SpawnedCharacterMap)
+	{
+		for (auto ch : tuple.Value)
+			ch->Destroy();
+	}
+	Camera->Destroy();
+	SelectWidgetActor->Destroy();
+	SelectTargetCursorActor->Destroy();
+
 	// ui 팝업에 tps필드 이동을 달아놓자
+	UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
+
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
+
 }
 
 bool ATurnBasedPhaseManager::IsPlayerDefeat()
@@ -294,7 +592,21 @@ void ATurnBasedPhaseManager::HandlePlayerDefeat()
 	* 패배 후 어디로? 메인? 최근 저장된곳?
 	*/
 
-	// ui 팝업에 다음 페이즈 이동을 달아놓자
+	//필드 정리하기
+	for (auto& tuple : SpawnedCharacterMap)
+	{
+		for (auto ch : tuple.Value)
+			ch->Destroy();
+	}
+	Camera->Destroy();
+	SelectWidgetActor->Destroy();
+	SelectTargetCursorActor->Destroy();
+
+	// ui 팝업에 tps필드 이동을 달아놓자
+	UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
+
+	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
 }
 
 void ATurnBasedPhaseManager::SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData)
@@ -317,4 +629,27 @@ void ATurnBasedPhaseManager::RequestSpawnCharacter(uint8 TeamID, UTurnBasedChara
 	for (const auto& i : SpawnRequestCountMap)
 		if (i.Value > 0)return;
 	TrySpawnCharacter();
+}
+
+void ATurnBasedPhaseManager::ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext)
+{
+	Camera->ApplyCameraMove(InEffectContext);
+}
+
+void ATurnBasedPhaseManager::ReserveAction(const FPayloadContext* InEffectContext)
+{
+	UDA_ActionReservation* da = Cast<UDA_ActionReservation>(InEffectContext->Payload);	
+	CheckTrue_Print(!da, "da is nullptr");
+
+	ReservedActions.FindOrAdd(da->Timing).Add(*InEffectContext);
+}
+
+const TSet<ATurnBasedCharacter*>& ATurnBasedPhaseManager::GetPlayerCharacters() const
+{
+	return SpawnedCharacterMap[TEAMID_PLAYER];
+}
+
+const TSet<ATurnBasedCharacter*>& ATurnBasedPhaseManager::GetEnemyCharacters() const
+{
+	return SpawnedCharacterMap[TEAMID_ENEMY];
 }
