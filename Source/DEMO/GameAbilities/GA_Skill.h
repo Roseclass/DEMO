@@ -13,24 +13,6 @@
 class UAnimMontage;
 class ADamageDealer;
 
-USTRUCT(BlueprintType)
-struct FDamageEhancementData
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(EditDefaultsOnly)
-		FGameplayTag AdditiveTag;
-
-	UPROPERTY(EditDefaultsOnly)
-		FGameplayTag MultiplicitiveTag;
-
-	UPROPERTY()
-		float Additive;
-
-	UPROPERTY()
-		float Multiplicitive = 100;
-};
-
 UCLASS()
 class DEMO_API UGA_Skill : public UGA_MontageWithEvent
 {
@@ -55,8 +37,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FSpawnDamageDealerContext> DamageDealerDatas;
 
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Data")
-		FDamageEhancementData DamageData;
+	int32 PayloadEventDataIdx;
+	UPROPERTY(EditAnywhere, Category = "Data")
+		TArray<FPayloadContext> PayloadEventDatas;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
+		ESkillTargetType TargetType;
 
 	UPROPERTY(EditAnywhere, Category = "Condition|Cost")
 		FScalableFloat CostBase;
@@ -64,30 +50,40 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Condition|Cooldown")
 		int32 CooldownTurns;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Condition|Cooldown")
-		int32 CooldownLeft;
-
 	UPROPERTY(Transient)
 		FGameplayTagContainer TempCooldownTags;
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag SkillTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag NextDamageDealerTriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextPayloadEventTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTagContainer CooldownTags;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
-		FGameplayTag EnhancementTag;
 
 	//function
 private:
 protected:
+	virtual void InitAbility()override;
+
 	virtual void SpawnDamageDealer();
+	virtual void ExecutePayloadEvent();
 	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)override;
 
 	virtual float GetCooldown(const FGameplayAbilityActorInfo* ActorInfo)const;
 	virtual float GetCost(const FGameplayAbilityActorInfo* ActorInfo)const;
+
+	UFUNCTION(BlueprintImplementableEvent)float GetCalculatedDamage(int32 InLevel, float InPower, int32 InDamageDealerDataIndex)const;
 public:
+	FORCEINLINE FGameplayTag GetSkillTag() const { return SkillTag; }
+	FORCEINLINE ESkillTargetType GetTargetType() const { return TargetType; }
+	TArray<float> GetCalculatedDamages(int32 InLevel, float InPower)const;
 };
 
 /*

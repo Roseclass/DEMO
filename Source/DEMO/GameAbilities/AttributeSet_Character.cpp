@@ -2,11 +2,15 @@
 #include "Global.h"
 #include "GameplayEffectExtension.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayCueManager.h"
+
+#include "GameAbilities/GameplayEffectContexts.h"
+
 
 UAttributeSet_Character::UAttributeSet_Character()
 {
-    InitHealth(100);
-    InitMaxHealth(100);
+    InitHealth(10);
+    InitMaxHealth(10);
     InitMana(100);
     InitMaxMana(100);
     InitDefense(0);
@@ -22,7 +26,7 @@ UAttributeSet_Character::UAttributeSet_Character()
 
 void UAttributeSet_Character::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
-    Super::PreAttributeChange(Attribute, NewValue);
+    Super::PreAttributeChange(Attribute, NewValue);    
 
     //// If a Max value changes, adjust current to keep Current % of Current to Max
     //if (Attribute == GetTimeDilationAttribute())
@@ -51,16 +55,27 @@ void UAttributeSet_Character::PostGameplayEffectExecute(const FGameplayEffectMod
 
     Super::PostGameplayEffectExecute(Data);
 
+    AActor* OwningActor = Cast<AActor>(GetOwningAbilitySystemComponent()->GetOwner());
+
     if (Data.EvaluatedData.Attribute == GetHealthAttribute())
     {
-        if (GetHealth() <= 0)
-        {
-            UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
-            FGameplayTagContainer tags;
-            tags.AddTag(FGameplayTag::RequestGameplayTag("Ability.Dead"));
-            AbilityComp->TryActivateAbilitiesByTag(tags);
-        }
+        FDamageEffectContext* context = new FDamageEffectContext();
+        context->CalculatedDamage = FMath::Abs(Data.EvaluatedData.Magnitude);
+        context->Location = OwningActor->GetActorLocation();
+
+        FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
+        EffectContextHandle.AddInstigator(Data.EffectSpec.GetContext().GetInstigator(), Data.EffectSpec.GetContext().GetEffectCauser());
+
+        GetOwningAbilitySystemComponent()->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.DamageText"), EffectContextHandle);
+
         SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+    }
+    else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
+    {
+        float newHealth = GetMaxHealth();
+        if (Data.EvaluatedData.ModifierOp == EGameplayModOp::Additive)
+            newHealth = (GetHealth() + GetMaxHealth() - Data.EvaluatedData.Magnitude);
+        SetHealth(newHealth);        
     }
     else if (Data.EvaluatedData.Attribute == GetManaAttribute())
     {

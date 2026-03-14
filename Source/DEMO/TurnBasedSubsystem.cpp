@@ -10,6 +10,7 @@
 
 #include "Datas/GameInstanceTypes.h"
 
+#include "Objects/TurnBasedEventResolver.h"
 #include "Objects/TurnBasedPhaseManager.h"
 
 UTurnBasedSubsystem::UTurnBasedSubsystem()
@@ -38,6 +39,7 @@ void UTurnBasedSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UTurnBasedSubsystem::InitializeTurnBasedField()
 {
 	if (Manager)Manager->Destroy();
+	if (EventResolver)EventResolver->Destroy();
 	CheckNull(TempContext);
 
 	// 위치에 맞게 액터 스폰
@@ -51,6 +53,9 @@ void UTurnBasedSubsystem::InitializeTurnBasedField()
 	Manager->AddToSpawnMap(TempContext->Instigator->GetGenericTeamId(), TempContext->Instigator->GetDataTags());
 	Manager->AddToSpawnMap(TempContext->Target->GetGenericTeamId(), TempContext->Target->GetDataTags());
 
+	EventResolver = GetWorld()->SpawnActorDeferred<ATurnBasedEventResolver>(ATurnBasedEventResolver::StaticClass(), FTransform());
+	UGameplayStatics::FinishSpawningActor(EventResolver, FTransform());
+
 	for (auto i : TempContext->Instigator->GetDataTags())
 	{
 		TArray<FSoftObjectPath> ptrArr;
@@ -58,11 +63,7 @@ void UTurnBasedSubsystem::InitializeTurnBasedField()
 		ptrArr.Add(Registry->CharacterDAMap[i]->AnimBlueprint.ToSoftObjectPath());
 		TFunction<void()> bind = [this, i]()
 		{
-			if (!Manager)
-			{
-				CLog::Print("???");
-				return;
-			}
+			CheckTrue_Print(!Manager, "!Manager");
 			Manager->RequestSpawnCharacter(TempContext->Instigator->GetGenericTeamId(), Registry->CharacterDAMap[i]);
 		};
 		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
@@ -75,11 +76,7 @@ void UTurnBasedSubsystem::InitializeTurnBasedField()
 		ptrArr.Add(Registry->CharacterDAMap[i]->AnimBlueprint.ToSoftObjectPath());
 		TFunction<void()> bind = [this, i]()
 		{
-			if (!Manager)
-			{
-				CLog::Print("???");
-				return;
-			}
+			CheckTrue_Print(!Manager, "!Manager");
 			Manager->RequestSpawnCharacter(TempContext->Target->GetGenericTeamId(), Registry->CharacterDAMap[i]);
 		};
 		UDEMOAssetManager::GetIfValid()->RequestAsyncLoad(ptrArr, MoveTemp(bind));
@@ -128,9 +125,19 @@ void UTurnBasedSubsystem::ExitTurnBased(FPhaseTransitionToken InToken)
 	{
 		// 서브레벨 언로드
 
+		/*
+		* 매니저한테 부탁해서 언로드하기
+		*/
+
+		FLatentActionInfo latentInfo;
+		latentInfo.CallbackTarget = this;
+		latentInfo.Linkage = 0;
+
+		UGameplayStatics::UnloadStreamLevel(GetWorld(), FName(TEXT("DEMO_TB1")), latentInfo, 1);
+		
 		// 저장
-		USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
-		SLS->SaveData();
+		//USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
+		//SLS->SaveData();
 	}
 
 	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
@@ -150,6 +157,47 @@ FTurnBasedFieldLayoutRow UTurnBasedSubsystem::FindSoftByFieldId(ETurnBasedFieldI
 {
 	return *LevelDatas[FieldId];
 }
+
+void UTurnBasedSubsystem::ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext)
+{
+	Manager->ApplyCameraMove(InEffectContext);
+}
+
+void UTurnBasedSubsystem::ReserveAction(const FPayloadContext* InEffectContext)
+{
+	Manager->ReserveAction(InEffectContext);
+}
+
+void UTurnBasedSubsystem::ApplyGE(const FPayloadContext* InEffectContext)
+{
+	Manager->ApplyGE(InEffectContext);
+}
+
+void UTurnBasedSubsystem::SolveHitEvent(const FEffectEventContext* InEffectContext)
+{
+	EventResolver->SolveEvent(InEffectContext, EEffectEventPhase::Hit);
+}
+
+void UTurnBasedSubsystem::SolvePreEvent(const FEffectEventContext* InEffectContext)
+{
+	EventResolver->SolveEvent(InEffectContext, EEffectEventPhase::Pre);
+}
+
+void UTurnBasedSubsystem::ChangeTarget(ATurnBasedCharacter* InTarget)
+{
+	Manager->ChangeTarget(InTarget);
+}
+
+TSet<ATurnBasedCharacter*> UTurnBasedSubsystem::GetPlayerCharacters()const
+{
+	return Manager->GetPlayerCharacters();
+}
+
+TSet<ATurnBasedCharacter*> UTurnBasedSubsystem::GetEnemyCharacters()const
+{
+	return Manager->GetEnemyCharacters();
+}
+
 
 /*
 * 메인메뉴 - > tps 필드 넘어올때 세이브 파일로부터 da 받아서 tps 세팅

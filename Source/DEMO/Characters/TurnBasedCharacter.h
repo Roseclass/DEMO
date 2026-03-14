@@ -26,8 +26,8 @@ public:
 
 	//property
 private:
-	FTurnBasedCharacterRuntimeData RuntimeData;
 protected:
+	FTurnBasedCharacterRuntimeData RuntimeData;
 	//scene
 
 	//actor
@@ -40,6 +40,8 @@ public:
 	//function
 private:
 protected:
+	virtual void InitAssets(UPrimaryDataAsset* DA);
+	virtual void InitGA(UPrimaryDataAsset* DA);
 public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const override;
@@ -53,4 +55,8 @@ public:
 	//from asc
 	float GetSpeed() const;
 	float GetTurnGauge() const;
+
+	void PrintAbilities();
+
+	bool IsDead();
 };

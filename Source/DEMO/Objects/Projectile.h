@@ -26,18 +26,20 @@ public:
 private:
 	bool bCollsion;
 	bool bCollsionEvent;
-	FHitResult HitResult;
-	float CurrentDamageTick;
 	TArray<UShapeComponent*> CollisionComponents;
 protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence")
+		bool bUseCollsionEvent = 1;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence", meta = (ClampMin = 0.00, EditCondition = "bUseDeactivateCameraMove", EditConditionHides))
+		float CollsionEventDelay;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 		UProjectileMovementComponent* ProjectileMovementComponent;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Init")
 		FName OverlapComponentTag = FName("OverlapCollision");
 
-	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence", meta = (ClampMin = 0.10))
-		float DamageTick = 0.1;
 
 public:
 
@@ -52,6 +54,7 @@ protected:
 
 	FORCEINLINE const TArray<UShapeComponent*>& GetCollisionComponents()const { return CollisionComponents; }
 public:
+	virtual void Init(const FSpawnDamageDealerContext* InData)override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)AActor* GetTarget();
 };

@@ -32,7 +32,7 @@ void AProjectile::BeginPlay()
 
 void AProjectile::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+	AActor::Tick(DeltaTime);
 
 	if (bCollsion)
 	{
@@ -40,7 +40,7 @@ void AProjectile::Tick(float DeltaTime)
 		if (CurrentDamageTick < DamageTick)
 		{
 			DamageTick -= CurrentDamageTick;
-			SendDamage(GamePlayEffectClass, GetDataContext().TargetActor.Get(), HitResult);
+			SendDamage(GetTarget(), HitResult);
 		}
 	}
 }
@@ -55,9 +55,8 @@ void AProjectile::OnComponentBeginOverlap(UPrimitiveComponent* OverlappedCompone
 	HitResult = SweepResult;
 
 	bCollsion = 1;
-	SendDamage(GamePlayEffectClass, OtherActor, SweepResult);
-
 	SendEvent(GetDataContext().CollisionTriggerDatas, bCollsionEvent);
+	SendDamage(OtherActor, SweepResult);
 }
 
 void AProjectile::OnComponentEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
@@ -101,6 +100,13 @@ bool AProjectile::TryDestroy()
 	}
 
 	return result;
+}
+
+void AProjectile::Init(const FSpawnDamageDealerContext* InData)
+{
+	Super::Init(InData);
+
+	bCollsionEvent = !bUseCollsionEvent;
 }
 
 AActor* AProjectile::GetTarget()

@@ -12,12 +12,24 @@
 //#include "GameAbilities/AbilityTypes.h"
 
 USTRUCT(BlueprintType)
-struct FAttributeInitialInfo
+struct FAttributeInitialStat
 {
     GENERATED_BODY()
 public:
     UPROPERTY(EditDefaultsOnly)
-        TArray<FGameplayModifierInfo> InitalStats;
+        float Stat;
+
+    UPROPERTY(EditDefaultsOnly)
+        FGameplayAttribute Attribute;
+};
+
+USTRUCT(BlueprintType)
+struct FAttributeInitialInfos
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(EditDefaultsOnly)
+        TArray<FAttributeInitialStat> InitalStats;
 };
 
 USTRUCT(BlueprintType)

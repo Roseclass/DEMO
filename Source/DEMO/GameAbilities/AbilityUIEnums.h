@@ -20,3 +20,15 @@ enum class ESkillListLocation : uint8
 	Skill_30, Skill_31, 
 	MAX UMETA(Hidden)
 };
+
+UENUM(BlueprintType)
+enum class ESkillTargetType : uint8
+{
+	Enemy,
+	Ally,
+	AllyButSelf,
+	All,
+	AllButSelf,
+	Self,
+	MAX UMETA(Hidden)
+};

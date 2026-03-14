@@ -9,8 +9,13 @@
 /**
  * 
  */
+struct FCameraMoveEffectContext;
+struct FPayloadContext;
+struct FEffectEventContext;
 
 class ATurnBasedPhaseManager;
+class ATurnBasedEventResolver;
+class ATurnBasedCharacter;
 class UPhaseTransitionContext;
 
 UCLASS()
@@ -26,6 +31,7 @@ public:
 	//property
 private:
 	ATurnBasedPhaseManager* Manager;
+	ATurnBasedEventResolver* EventResolver;
 	bool bInitPhaseSystem;
 	UPROPERTY()UPhaseTransitionContext* TempContext;
 	FPhaseTransitionToken ActiveToken;
@@ -45,7 +51,16 @@ public:
 	void InitPhaseSystem();
 	FTurnBasedFieldLayoutRow FindSoftByFieldId(ETurnBasedFieldId FieldId) const;
 
+public: // from manager
+	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
+	void ReserveAction(const FPayloadContext* InEffectContext);
+	void ApplyGE(const FPayloadContext* InEffectContext);
+	void SolveHitEvent(const FEffectEventContext* InEffectContext);
+	void SolvePreEvent(const FEffectEventContext* InEffectContext);
+	void ChangeTarget(ATurnBasedCharacter* InTarget);
 
+	TSet<ATurnBasedCharacter*> GetPlayerCharacters()const;
+	TSet<ATurnBasedCharacter*> GetEnemyCharacters()const;
 };
 
 

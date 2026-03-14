@@ -12,7 +12,9 @@
 
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
+#include "GameAbilities/ExecutionContextTypes.h"
 #include "GameAbilities/GameplayEffectContexts.h"
+#include "GameAbilities/GE_InstantDamage.h"
 #include "GameAbilities/MMC_Damage.h"
 
 ADamageDealer::ADamageDealer()
@@ -28,38 +30,90 @@ void ADamageDealer::BeginPlay()
 void ADamageDealer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-}
 
-void ADamageDealer::SendDamage(TSubclassOf<UGameplayEffect> EffectClass, AActor* Target, const FHitResult& SweepResult)
-{
-	CheckTrue(MaxHitCount <= CurrentHitCount);
-
-	SendEvent(GetDataContext().DamageSendTriggerDatas, bSendDamageEvent);
-
-	IAbilitySystemInterface* hitCharacter = Cast<IAbilitySystemInterface>(Target);
-	if (hitCharacter)
+	if (bAct)
 	{
-		// Get asc
-		ATurnBasedCharacter* owner = Cast<ATurnBasedCharacter>(GetOwner());
-		UAbilityComponent* hitASC = Cast<UAbilityComponent>(hitCharacter->GetAbilitySystemComponent());
-		UAbilityComponent* instigatorASC = Cast<UAbilityComponent>(owner->GetAbilitySystemComponent());
-		if (hitASC && instigatorASC && EffectClass)
+		CurrentDamageTick += DeltaTime;
+		if (CurrentDamageTick < DamageTick)
 		{
-			// Make effectcontext handle
-			FDamageEffectContext* context = new FDamageEffectContext();
-			context->BaseDamage = CalculateDamage(instigatorASC->GetPower());
-			context->AddOrigin(Target->GetActorLocation());
-
-			FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
-			EffectContextHandle.AddInstigator(owner ? owner->GetController() : nullptr, this);
-			EffectContextHandle.AddHitResult(SweepResult);
-
-			// Must use EffectToTarget for auto mmc
-			instigatorASC->ApplyGameplayEffectToTarget(EffectClass.GetDefaultObject(), hitASC, UGameplayEffect::INVALID_LEVEL, EffectContextHandle);
+			DamageTick -= CurrentDamageTick;
+			SendDamage(GetDataContext().TargetActor.Get(), HitResult);
 		}
 	}
+}
+
+void ADamageDealer::SendDamage(AActor* Target, const FHitResult& SweepResult)
+{
+	ABaseCharacter* hitCharacter = Cast<ABaseCharacter>(Target);
+	CheckNull(hitCharacter);
+	CheckTrue(MaxHitCount <= CurrentHitCount);
+
+	// Get asc
+	ABaseCharacter* owner = Cast<ABaseCharacter>(GetOwner());
+	UAbilityComponent* instigatorASC = Cast<UAbilityComponent>(owner->GetAbilitySystemComponent());
+	UAbilityComponent* targetASC = Cast<UAbilityComponent>(hitCharacter->GetAbilitySystemComponent());
+	ApplyDamageGE(instigatorASC, targetASC, SweepResult);
+	ApplyAdditiveEffectData(instigatorASC, targetASC, SweepResult);
+	SendEvent(GetDataContext().DamageSendTriggerDatas, bSendDamageEvent);
+
 	if (MaxHitCount <= ++CurrentHitCount)
 		Deactivate();
+}
+
+void ADamageDealer::ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComponent* TargetASC, const FHitResult& SweepResult)
+{
+	CheckTrue_Print(!DamageGEClass, "DamageGEClass is nullptr!!");
+	if (InstigatorASC && TargetASC && DamageGEClass)
+	{
+		FExecutionContext* context = new FExecutionContext();
+		context->EffectCauserActor = InstigatorASC->GetAvatarActor();
+		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
+		context->EffectTargetActor = TargetASC->GetAvatarActor();
+		context->SkillCauserActor = InstigatorASC->GetAvatarActor();
+		context->SkillTargetActor = TargetASC->GetAvatarActor();
+
+		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
+		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);
+		EffectContextHandle.AddHitResult(SweepResult);
+
+		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(DamageGEClass, 1, EffectContextHandle);
+
+		InstigatorASC->ApplyGameplayEffectSpecToTarget(*EffectSpecHandle.Data, TargetASC);
+	}
+}
+
+void ADamageDealer::ApplyAdditiveEffectData(UAbilityComponent* InstigatorASC, UAbilityComponent* TargetASC, const FHitResult& SweepResult)
+{
+	//TODO::데미지 따로 계산할수있게하기
+
+	CheckTrue(AdditiveEffectData.Rule == EDamageTriggerRule::NONE);
+	CheckTrue(AdditiveEffectData.Rule == EDamageTriggerRule::OnFirstHit && 0 < CurrentHitCount);
+	if (InstigatorASC && TargetASC)
+	{
+		// Make effectcontext handle
+		FDamageParameters params;
+		params.InstigatorPower = InstigatorASC->GetPower();
+		params.InstigatorSpeed = InstigatorASC->GetSpeed();
+		params.TargetDefense = TargetASC->GetDefense();
+		params.TargetHealth = TargetASC->GetHealth();
+		params.TargetMaxHealth = TargetASC->GetMaxHealth();
+
+		//float calculatedDamage = CalculateDamage(params);
+
+		FDamageEffectContext* context = new FDamageEffectContext();
+		//context->CalculatedDamage = calculatedDamage;
+		context->Location = TargetASC->GetAvatarActor()->GetActorLocation();
+
+		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
+		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);
+		EffectContextHandle.AddHitResult(SweepResult);
+
+		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(AdditiveEffectData.GEClass, 1, EffectContextHandle);
+		EffectSpecHandle.Data.Get()->StackCount = AdditiveEffectData.StackCount;
+		EffectSpecHandle.Data.Get()->DynamicGrantedTags.AddTag(AdditiveEffectData.GrantedTag);
+
+		InstigatorASC->ApplyGameplayEffectSpecToTarget(*EffectSpecHandle.Data, TargetASC);
+	}
 }
 
 void ADamageDealer::Activate()
@@ -184,15 +238,21 @@ void ADamageDealer::SendEvent(const TArray<FDamageDealerTriggerData>& InDatas, b
 			{
 				ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(Data.GetInstigator());
 				FGameplayEventData data;
-				instigator->GetAbilitySystemComponent()->HandleGameplayEvent(i.Tag, &data);
+				UAbilitySystemComponent* asc = instigator->GetAbilitySystemComponent();
+				if (!asc)
+				{
+					CLog::Print(instigator->GetName() + i.Tag.ToString(), -1, 10, FColor::Purple);
+					return;
+				}
+				asc->HandleGameplayEvent(i.Tag, &data);
 			});
 		if (i.Delay <= 1e-9)
 		{
 			func.Execute();
 			continue;
 		}
-		FTimerHandle spawnNextDamageDealerHandle;
-		GetWorld()->GetTimerManager().SetTimer(spawnNextDamageDealerHandle, func, i.Delay, false);
+		FTimerHandle handle;
+		GetWorld()->GetTimerManager().SetTimer(handle, func, i.Delay, false);
 	}
 	InFlag = 1;
 }

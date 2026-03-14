@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
@@ -16,6 +16,7 @@
 //#include "Characters/TurnBasedCharacterData.h"
 
 class UAnimInstance;
+class UBehaviorTree;
 class USkeletalMesh;
 class UGameplayEffect;
 class UGA_BaseAbility;
@@ -27,16 +28,16 @@ struct FTurnBasedCharacterRuntimeData
 	GENERATED_BODY()
 public:
 	bool bInitComplete = 0;
-	// ¼­ºê ½Ã½ºÅÛ (·¹Áö½ºÆ®¸®->¸Ê)¿¡¼­ÀÇ Å°°ª
+	// ì„œë¸Œ ì‹œìŠ¤í…œ (ë ˆì§€ìŠ¤íŠ¸ë¦¬->ë§µ)ì—ì„œì˜ í‚¤ê°’
 	UPROPERTY(Transient)
 		FGameplayTag DataTag;
 
-	// ½½·Ô µ¥ÀÌÅÍ
+	// ìŠ¬ë¡¯ ë°ì´í„°
 	UPROPERTY(Transient)
 		FGameplayTag EquippedSkillTags[int32(ESkillSlotLocation::MAX)];
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Camera")
-		FTransform SelectTargetTransform;
+		FTransform SelectTargetTransform = FTransform(FVector3d(0, 0, 120));
 
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Camera")
 		FTransform SelectSkillTransform;
@@ -50,72 +51,91 @@ class DEMO_API UTurnBasedCharacterData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 public:
-	UTurnBasedCharacterData()
-	{
-		{	//Defense
-			FGameplayModifierInfo Mod;
-			Mod.Attribute = UAttributeSet_Character::GetDefenseAttribute();
-			Mod.ModifierOp = EGameplayModOp::Additive;
-			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod);
-		}
-
-		{	//Power
-			FGameplayModifierInfo Mod;
-			Mod.Attribute = UAttributeSet_Character::GetPowerAttribute();
-			Mod.ModifierOp = EGameplayModOp::Additive;
-			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod);
-		}
-
-		{	//Speed
-			FGameplayModifierInfo Mod;
-			Mod.Attribute = UAttributeSet_Character::GetSpeedAttribute();
-			Mod.ModifierOp = EGameplayModOp::Additive;
-			Mod.ModifierMagnitude = FScalableFloat();
-			AttributeInitialInfo.InitalStats.Add(Mod);
-		}
-
-	};
-protected:
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override
-	{
-		Super::PostEditChangeProperty(PropertyChangedEvent);
-
-		UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
-		TSharedPtr<FGameplayTagNode> tagNode = Manager.FindTagNode(SkillRootTag);
-
-		if(!tagNode.IsValid())return;
-		for (auto i : tagNode->GetChildTagNodes())
-		{
-			if (GrantedAbilities.Contains(i->GetCompleteTag()))continue;
-			GrantedAbilities.FindOrAdd(i->GetCompleteTag());
-		}
-	};
-public:
-	// Ä³¸¯ÅÍ¿¡ Init ¶§ º¹»çÇÒ µ¥ÀÌÅÍ
+	// ìºë¦­í„°ì— Init ë•Œ ë³µì‚¬í•  ë°ì´í„°
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Runtime|Datas")
 		FTurnBasedCharacterRuntimeData RuntimeData;
 
-	// ½ÃÀÛ ½Ã ºÎ¿©ÇÒ ÅÂ±×(¿¹: State.Combat.Ready µî)
+	// ìºë¦­í„°ì˜ ìŠ¤í‚¬ ë£¨íŠ¸ íƒœê·¸
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
 		FGameplayTag SkillRootTag;
 
-	// ½ÃÀÛ ½Ã ºÎ¿©ÇÒ ¾îºô¸®Æ¼ ¸ñ·Ï
+	// ì‹œì‘ ì‹œ ë¶€ì—¬í•  ì–´ë¹Œë¦¬í‹° ëª©ë¡
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
 		TMap<FGameplayTag, FAbilitySpecInfo> GrantedAbilities;
+	
+	// ì‚¬ìš© ê°€ëŠ¥í•œ ì–´ë¹Œë¦¬í‹° ëª©ë¡
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
+		TMap<FGameplayTag, FAbilitySpecInfo> AvailableAbilities;
 
-	// ½ÃÀÛ ½Ã ºÎ¿©ÇÒ ÅÂ±×(¿¹: State.Combat.Ready µî)
+	// ì‹œì‘ ì‹œ ë¶€ì—¬í•  íƒœê·¸(ì˜ˆ: State.Combat.Ready ë“±)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
 		FGameplayTagContainer DefaultOwnedTags;
 
-	// ½ÃÀÛ ½Ã Àû¿ëÇÒ GE(¹öÇÁ/±âº» ½ºÅÈ)
+	// ì‹œì‘ ì‹œ ì ìš©í•  GE(ë²„í”„/ê¸°ë³¸ ìŠ¤íƒ¯)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Init|GAS")
-		FAttributeInitialInfo AttributeInitialInfo;
+		FAttributeInitialInfos AttributeInitialInfos;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
 		TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|Mesh")
 		TSoftClassPtr<UAnimInstance> AnimBlueprint;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Init|AI")
+		TSoftObjectPtr<UBehaviorTree> BehaviorTree;
+
+	UPROPERTY(EditAnywhere, Category = "Init|AI")
+		FGameplayTag AIEquippedSkillTags[(int32)ESkillSlotLocation::MAX];
+public:
+	UTurnBasedCharacterData()
+	{
+		{	//Health
+			FAttributeInitialStat MaxHealth;
+			MaxHealth.Attribute = UAttributeSet_Character::GetMaxHealthAttribute();
+			MaxHealth.Stat = 100;
+			AttributeInitialInfos.InitalStats.Add(MaxHealth);
+		}
+
+		{	//Defense
+			FAttributeInitialStat Defense;
+			Defense.Attribute = UAttributeSet_Character::GetDefenseAttribute();
+			Defense.Stat = 0;
+			AttributeInitialInfos.InitalStats.Add(Defense);
+		}
+
+		{	//Power
+			FAttributeInitialStat Power;
+			Power.Attribute = UAttributeSet_Character::GetPowerAttribute();
+			Power.Stat = 0;
+			AttributeInitialInfos.InitalStats.Add(Power);
+		}
+
+		{	//Speed
+			FAttributeInitialStat Speed;
+			Speed.Attribute = UAttributeSet_Character::GetSpeedAttribute();
+			Speed.Stat = 50;
+			AttributeInitialInfos.InitalStats.Add(Speed);
+		}
+	};
+protected:
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override
+	{
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+
+		if (!GrantedAbilities.Contains(FGameplayTag::RequestGameplayTag("Skill.System.Dead")))
+			GrantedAbilities.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.System.Dead"));
+
+		if (!GrantedAbilities.Contains(FGameplayTag::RequestGameplayTag("Skill.System.Hit")))
+			GrantedAbilities.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.System.Hit"));
+
+		UGameplayTagsManager & Manager = UGameplayTagsManager::Get();
+		TSharedPtr<FGameplayTagNode> tagNode = Manager.FindTagNode(SkillRootTag);
+
+		if (!tagNode.IsValid())return;
+		for (auto i : tagNode->GetChildTagNodes())
+		{
+			if (AvailableAbilities.Contains(i->GetCompleteTag()))continue;
+				AvailableAbilities.FindOrAdd(i->GetCompleteTag());
+		}
+	};
 };

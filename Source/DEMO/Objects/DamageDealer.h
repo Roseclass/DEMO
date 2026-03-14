@@ -9,13 +9,48 @@
 class AController;
 class UShapeComponent;
 class UGameplayEffect;
+class UAbilityComponent;
+
+USTRUCT(BlueprintType)
+struct FDamageParameters
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadOnly)float InstigatorPower;
+	UPROPERTY(BlueprintReadOnly)float InstigatorSpeed;
+	UPROPERTY(BlueprintReadOnly)float TargetDefense;
+	UPROPERTY(BlueprintReadOnly)float TargetHealth;
+	UPROPERTY(BlueprintReadOnly)float TargetMaxHealth;
+	UPROPERTY(BlueprintReadOnly)bool bIsCritical;
+};
 
 UENUM(BlueprintType)
-enum class EDamageDealerType : uint8
+enum class EDamageTriggerRule : uint8
 {
-	SingleHit,
-	MultiHit,
-	MAX UMETA(Hidden)
+	NONE,
+	Always,
+	OnFirstHit,
+	OnCriticalHit,
+	OncePerTarget,
+	MAX UMETA(meta = (Hidden))
+};
+
+USTRUCT(BlueprintType)
+struct FDamageEffectData
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(EditDefaultsOnly)
+		EDamageTriggerRule Rule;
+
+	UPROPERTY(EditDefaultsOnly)
+		TSubclassOf<UGameplayEffect> GEClass;
+
+	UPROPERTY(EditDefaultsOnly)
+		FGameplayTag GrantedTag;
+
+	UPROPERTY(EditDefaultsOnly, meta = (ClampMin = 1.00))
+		int32 StackCount;
 };
 
 UCLASS()
@@ -42,11 +77,14 @@ private:
 	int32 CurrentHitCount;
 	FSpawnDamageDealerContext Data;
 protected:
+	float CurrentDamageTick;
+	FHitResult HitResult;
+protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Init")
-		EDamageDealerType DamageDealerType;
+		TSubclassOf<UGameplayEffect> DamageGEClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Datas|Init", meta = (ClampMin = 1.00, EditCondition = "DamageDealerType == EDamageDealerType::MultiHitTimed", EditConditionHides))
-		int32 MaxHitCount;
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Init")
+		int32 MaxHitCount = 1;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Init")
 		float ActivateDelay;
@@ -72,23 +110,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence", meta = (ClampMin = 0.00, EditCondition = "bUseDeactivateSpawnDamageDealer", EditConditionHides))
 		float SpawnDamageDealerDelay;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence", meta = (ClampMin = 0.10))
+		float DamageTick = 0.1;	
+
+
+
 	/*
 	* activate,deactivate effect Ãß°¡ÇØ¾ßµÊ
 	* hiteffect
 	*/
 
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Ability")
-		TSubclassOf<UGameplayEffect> GamePlayEffectClass;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Datas|Ability")
-		FGameplayTagContainer DamageEffectTags;
+		FDamageEffectData AdditiveEffectData;
 public:
 
 	//function
 private:
 protected:
-	UFUNCTION(BlueprintImplementableEvent)float CalculateDamage(float InPower);
-	virtual void SendDamage(TSubclassOf<UGameplayEffect> EffectClass, AActor* Target, const FHitResult& SweepResult);
+	virtual void SendDamage(AActor* Target, const FHitResult& SweepResult);
+	virtual void ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComponent* TargetASC, const FHitResult& SweepResult);
+	virtual void ApplyAdditiveEffectData(UAbilityComponent* InstigatorASC, UAbilityComponent* TargetASC, const FHitResult& SweepResult);
 	virtual void Activate();
 	virtual void ApplyNextCameraMove();
 	virtual void PlayNextMontage();

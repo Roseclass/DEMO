@@ -3,45 +3,50 @@
 #include "GameplayCueManager.h"
 #include "GameplayTagContainer.h"
 #include "AbilitySystemGlobals.h"
+#include "Abilities/Tasks/AbilityTask.h"
 
 #include "Characters/TurnBasedCharacter.h"
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/AbilityTaskTypes.h"
-#include "GameAbilities/AT_MontageNotifyEvent.h"
+#include "GameAbilities/AT_SkillNotifyEvent.h"
 #include "Objects/DamageDealer.h"
 
 UGA_Skill::UGA_Skill()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NextDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
+	NextPayloadEventTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextPayloadEvent");
+	CHelpers::GetClass<UGameplayEffect>(&CooldownGameplayEffectClass, "Blueprint'/Game/GAS/GE/GE_Cooldown.GE_Cooldown_C'");
 }
 
 void UGA_Skill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	DamageDealerDataIdx = 0;
 }
 
 float UGA_Skill::GetCooldownTimeRemaining(const FGameplayAbilityActorInfo* ActorInfo) const
 {
-	const UAbilitySystemComponent* const ASC = ActorInfo->AbilitySystemComponent.Get();
-	if (ASC)
+	float result = 0.0f;
+	const UAbilitySystemComponent* const asc = ActorInfo->AbilitySystemComponent.Get();
+
+	if (asc)
 	{
 		const FGameplayTagContainer* Tags = GetCooldownTags();
 		if (Tags && Tags->Num() > 0)
 		{
 			FGameplayEffectQuery const Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(*Tags);
-			TArray< float > Durations = ASC->GetActiveEffectsTimeRemaining(Query);
-			if (Durations.Num() > 0)
+			TArray<FActiveGameplayEffectHandle> effects = asc->GetActiveEffects(Query);
+			for (const auto& effecthandle : effects)
 			{
-				return CooldownLeft;
+				const FActiveGameplayEffect* effect = asc->GetActiveGameplayEffect(effecthandle);
+				result = UKismetMathLibrary::Max(result, effect->Spec.StackCount);
 			}
+			return result;
 		}
 	}
 
-	return 0.f;
+	return result;
 }
 
 bool UGA_Skill::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, OUT FGameplayTagContainer* OptionalRelevantTags) const
@@ -51,44 +56,31 @@ bool UGA_Skill::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, cons
 
 void UGA_Skill::GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const
 {
-	TimeRemaining = 0.f;
-	CooldownDuration = 0.f;
-
-	const FGameplayTagContainer* Tags = GetCooldownTags();
-	if (Tags && Tags->Num() > 0)
-	{
-		UAbilitySystemComponent* const AbilitySystemComponent = ActorInfo->AbilitySystemComponent.Get();
-		check(AbilitySystemComponent != nullptr);
-
-		FGameplayEffectQuery const Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(*Tags);
-		TArray< TPair<float, float> > DurationAndTimeRemaining = AbilitySystemComponent->GetActiveEffectsTimeRemainingAndDuration(Query);
-		if (DurationAndTimeRemaining.Num() > 0)
-		{
-			TimeRemaining = CooldownLeft;
-			CooldownDuration = CooldownTurns;
-		}
-	}
+	TimeRemaining = GetCooldownTimeRemaining(ActorInfo);
+	CooldownDuration = CooldownTurns;
 }
 
 void UGA_Skill::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
 {
-	UGameplayEffect* CooldownGE = GetCooldownGameplayEffect();
-	if (CooldownGE)
+	/*
+	* 쿨다운 effect는 지속시간 무한
+	* 쿨다운 턴계산은 stack count
+	*/
+
+	CheckTrue_Print(!CooldownGameplayEffectClass, "CooldownGameplayEffectClass is nullptr");
 	{
 		int32 lv = GetAbilityLevel();
-		FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(CooldownGE->GetClass(), 1);
-
-		// 쿨다운 GameplayEffect의 지속 시간을 설정
-		SpecHandle.Data.Get()->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag("Skill.Cooldown"), GetCooldown(ActorInfo));
-
+		FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(CooldownGameplayEffectClass);
+		SpecHandle.Data.Get()->StackCount = CooldownTurns;
+		SpecHandle.Data.Get();
 		// DynamicGrantedTags를 설정
 		TArray<FGameplayTag> tags;
 		GetCooldownTags()->GetGameplayTagArray(tags);
 		for (auto tag : tags)
 			SpecHandle.Data.Get()->DynamicGrantedTags.AddTag(tag);
-
-		// 적용
 		ApplyGameplayEffectSpecToOwner(Handle, ActorInfo, ActivationInfo, SpecHandle);
+
+		// TODO::만약 쿨타임이 중복으로 적용되면? 앞에서 거르긴하는데 혹시라도 +될수도있음
 	}
 }
 
@@ -143,6 +135,36 @@ void UGA_Skill::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGamepl
 	}
 }
 
+void UGA_Skill::InitAbility()
+{
+	MontageDataIdx = 0;
+	CameraMoveDataIdx = 0;
+	DamageDealerDataIdx = 0;
+	PayloadEventDataIdx = 0;
+
+	FTimerHandle WaitHandle;
+	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
+		{
+			FGameplayTagContainer tags;
+			tags.AddTag(EndTag);
+			tags.AddTag(NextMontageTriggerTag);
+			tags.AddTag(NextCameraMoveTriggerTag);
+			tags.AddTag(NextDamageDealerTriggerTag);
+			tags.AddTag(NextPayloadEventTriggerTag);
+			UAT_SkillNotifyEvent* task = UAT_SkillNotifyEvent::CreateSkillNotifyEvent(this, NAME_None, tags);
+			task->EventReceived.AddDynamic(this, &UGA_MontageWithEvent::EventReceived);
+
+			// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
+			task->ReadyForActivation();
+
+			PlayKeyMontage();
+			PlaySubMontages();
+			MontageDataIdx++;
+
+		}), MontageDatas[MontageDataIdx].StartDelay, false);
+	ApplyCameraMove();
+}
+
 void UGA_Skill::SpawnDamageDealer()
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
@@ -154,6 +176,20 @@ void UGA_Skill::SpawnDamageDealer()
 
 	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
 	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
+}
+
+void UGA_Skill::ExecutePayloadEvent()
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	FPayloadContext* context = PayloadEventDatas[PayloadEventDataIdx++].Duplicate();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventTargetActor = asc->GetTarget();
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(context->GCNTag, gameplayCueParameters);
 }
 
 void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
@@ -184,6 +220,16 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 		SpawnDamageDealer();
 		return;
 	}
+	else if(EventTag == NextPayloadEventTriggerTag)
+	{		
+		ExecutePayloadEvent();
+		return;
+	}
+}
+
+void UGA_Skill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 float UGA_Skill::GetCooldown(const FGameplayAbilityActorInfo* ActorInfo) const
@@ -197,4 +243,12 @@ float UGA_Skill::GetCost(const FGameplayAbilityActorInfo* ActorInfo) const
 	UAbilityComponent* skill = Cast<UAbilityComponent>(ActorInfo->AbilitySystemComponent);
 	int32 lv = GetAbilityLevel();
 	return CostBase.GetValueAtLevel(lv);
+}
+
+TArray<float> UGA_Skill::GetCalculatedDamages(int32 InLevel, float InPower)const
+{
+	TArray<float> result;
+	for (int32 i = 0; i < DamageDealerDatas.Num(); i++)
+		result.Add(GetCalculatedDamage(InLevel, InPower, i));
+	return result;
 }

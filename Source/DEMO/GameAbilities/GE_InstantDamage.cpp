@@ -8,10 +8,10 @@ UGE_InstantDamage::UGE_InstantDamage()
 
     FGameplayModifierInfo ModifierInfo;
     FSetByCallerFloat setByCaller;
+    setByCaller.DataName = FName("calculatedDamage");
 
     ModifierInfo.Attribute = UAttributeSet_Character::GetHealthAttribute();
     ModifierInfo.ModifierOp = EGameplayModOp::Additive;
-    //setByCaller.DataTag = FGameplayTag::RequestGameplayTag(FName("Effect.Damage"));
     ModifierInfo.ModifierMagnitude = FGameplayEffectModifierMagnitude(setByCaller);
     Modifiers.Add(ModifierInfo);
 

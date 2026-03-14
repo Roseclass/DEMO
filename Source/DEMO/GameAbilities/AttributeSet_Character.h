@@ -28,6 +28,7 @@ public:
 
 	//property
 private:
+    TMap<FGameplayAttribute, float> PreValue;
 protected:
     UPROPERTY(BlueprintReadOnly, Category = "Status|Health")
         FGameplayAttributeData Health;

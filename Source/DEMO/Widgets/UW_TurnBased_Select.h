@@ -30,6 +30,20 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FOnConfirm, FGameplayTag, ATurnBasedCharact
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnHorizontalMove, ATurnBasedCharacter*);
 DECLARE_DELEGATE_RetVal(bool, FCanAcceptKey);
 
+USTRUCT()
+struct FSelectSkillRowData
+{
+	GENERATED_BODY()
+public:
+	FSelectSkillRowData() {};
+	FSelectSkillRowData(FGameplayTag InTag, ESkillTargetType InType, int32 InRemainCd, int32 InCd)
+		: SkillTag(InTag), TargetType(InType), RemainCd(InRemainCd), Cd(InCd){};
+public:
+	FGameplayTag SkillTag;
+	ESkillTargetType TargetType;
+	int32 RemainCd;
+	int32 Cd;
+};
 
 UCLASS()
 class DEMO_API UUW_TurnBased_SelectSkillRow : public UUserWidget
@@ -41,8 +55,9 @@ public:
 
 	//property
 private:
+	bool bIsCoolDown;
 	UPROPERTY()UUMGSequencePlayer* CurrentPlayer;
-	FGameplayTag SkillTag;
+	FSelectSkillRowData RowData;
 protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 		UScaleBox* ScaleBox;
@@ -56,6 +71,12 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 		UImage* Cover;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+		UImage* CooltimeCover;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+		UTextBlock* CooltimeLeft;
+
 	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetAnim))
 		UWidgetAnimation* FocusAnim;
 public:
@@ -64,11 +85,15 @@ public:
 private:
 protected:
 public:
-	void Refresh(FGameplayTag InTag);
+	void Refresh(FSelectSkillRowData InData);
 	void OnFocus();
 	void OffFocus();
+	void OnFocusWithoutAnim();
+	void OffFocusWithoutAnim();
 
-	FORCEINLINE FGameplayTag GetTag()const { return SkillTag; }
+	FORCEINLINE FGameplayTag GetSkillTag()const { return RowData.SkillTag; }
+	FORCEINLINE FSelectSkillRowData GetRowData()const { return RowData; }
+	FORCEINLINE bool IsCoolDown()const { return bIsCoolDown; }
 };
 
 UCLASS()
@@ -95,7 +120,11 @@ private:
 	bool bActive;
 	ASelectWidgetActor* TargetCursorActor;
 	int32 TargetIndex;
-	TArray<ATurnBasedCharacter*> TargetArray;
+	int32 PlayerStartIndex;
+	int32 EnemyStartIndex;
+	TArray<ATurnBasedCharacter*> TargetArray; // Player~Enemy
+	TArray<ATurnBasedCharacter*> PlayerArray;
+	TArray<ATurnBasedCharacter*> EnemyArray;
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Slot", meta = (BindWidget))
 		UUW_TurnBased_SelectSkillRow* Icon_Attack;
@@ -122,22 +151,29 @@ public:
 	//function
 private:
 	//skill
-	UFUNCTION()void ChangeCursorLocation(int32 Offset);
-	void Up();
-	void Down();
+	void ChangeCursorLocation(ESkillSlotLocation NewLocation, bool Anim = 1);
+	UFUNCTION()void Up();
+	UFUNCTION()void Down();
 
 	//target
-	void Left();
-	void Right();
+	UFUNCTION()void Left();
+	UFUNCTION()void Right();
 
 	UFUNCTION()void Confirm();
+	bool CheckTargetType();
 	void SetWidgetDatas(ATurnBasedCharacter* NewTargetCharacter);
+
 protected:
 public:
 	void SetOwningActor(ASelectWidgetActor* NewOwningActor);
 	void SetTargetCursorActor(ASelectWidgetActor* NewTargetCursorActor);
-	void Activate(ATurnBasedCharacter* NewCurrentTurnCharacter, const TArray<ATurnBasedCharacter*>& InArray);
+	void Activate(ATurnBasedCharacter* NewCurrentTurnCharacter, const TArray<ATurnBasedCharacter*>& InPlayerArray, const TArray<ATurnBasedCharacter*>& InEnemyArray);
 
 	FGameplayTag GetCurrentSkillTag()const;
 	TArray<FGameplayTag> GetAllSkillTags()const;
+
+	ATurnBasedCharacter* GetCurrentTarget()const;
+	TArray<ATurnBasedCharacter*> GetTargetArray()const;
+	TArray<ATurnBasedCharacter*> GetPlayerArray()const;
+	TArray<ATurnBasedCharacter*> GetEnemyArray()const;
 };

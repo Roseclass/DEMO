@@ -24,8 +24,6 @@ public:
 	//property
 private:
 protected:
-	UPROPERTY(EditAnywhere)
-		TSubclassOf<ATurnbasedPhaseCamera> CameraActorClass;
 public:
 
 	//function

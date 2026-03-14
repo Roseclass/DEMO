@@ -103,6 +103,11 @@ void UTPSSubsystem::EnterTPS(FPhaseTransitionToken InToken, UObject* Context)
 	else if (ActiveToken.CurrentPhase == EGameInstancePhase::TurnBased)
 	{
 		// enemy ai 다시 작동, tps 인풋 활성화
+
+		//카메라 정상화
+		APlayerController* pc = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+		pc->SetInputMode(FInputModeGameOnly());
+		pc->SetViewTargetWithBlend(pc->GetPawn());
 	}
 
 	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());

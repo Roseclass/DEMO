@@ -14,7 +14,7 @@ struct FGameAbilityMontageData
 {
 	GENERATED_BODY()
 public:
-	UPROPERTY(EditAnywhere, Category = "Data")
+	UPROPERTY(EditAnywhere, Category = "Data", meta = (ClampMin = 0.10))
 		float StartDelay;
 
 	UPROPERTY(EditAnywhere, Category = "Data")
@@ -67,6 +67,7 @@ public:
 	//function
 private:
 protected:
+	virtual void InitAbility();
 	virtual void PlayKeyMontage();
 	virtual void PlaySubMontages();
 	virtual void ApplyCameraMove();

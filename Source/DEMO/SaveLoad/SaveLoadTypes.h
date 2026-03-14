@@ -111,7 +111,12 @@ public:
 
 		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Gideon"));
 		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Revenant"));
-		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Terra"));
+
+		FSaveUIData& terra = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Terra"));
+		terra.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Terra.Attack");
+		terra.EquippedSkillTags[int32(ESkillSlotLocation::Skill_0)] = FGameplayTag::RequestGameplayTag("Skill.Terra.ProtectBuff");
+		terra.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Terra.CounterAttack");
+		terra.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Terra.Stun");
 
 		key = FGuid::NewGuid();
 		saveGameData->SavedEnemyDatas;

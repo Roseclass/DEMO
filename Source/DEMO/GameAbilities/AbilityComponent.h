@@ -11,7 +11,7 @@
 
 class UGA_BaseAbility;
 class ATurnBasedCharacter;
-struct FAttributeInitialInfo;
+struct FAttributeInitialInfos;
 
 DECLARE_MULTICAST_DELEGATE(FAbilityComponentSignature);
 
@@ -24,10 +24,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 public:
+	virtual FActiveGameplayEffectHandle ApplyGameplayEffectSpecToSelf(const FGameplayEffectSpec& GameplayEffect, FPredictionKey PredictionKey = FPredictionKey())override;
 
 	//property
 private:
 	ATurnBasedCharacter* Target;
+	TSet<FActiveGameplayEffectHandle> DoTDamageHandles;
 protected:
 public:
 	FAbilityComponentSignature OnSkillEnd;
@@ -38,12 +40,17 @@ private:
 protected:
 public:
 	void InitGA(const TArray<FAbilitySpecInfo>& NewGAs);
-	void InitAttributes(const FAttributeInitialInfo* NewStats);
+	void InitAttributes(const FAttributeInitialInfos* NewStats);
 	void PlayDeadSequence();
 	void BroadcastOnSkillEnd();
 	void BroadcastOnDeadSequenceEnd();
 
+	//with TurnBased
+	void GetAllDoTDamageHandles(OUT TArray<FActiveGameplayEffectHandle>& OutHandles);
+	void HandleDoTDamage(FActiveGameplayEffectHandle InHandle, OUT AActor** EventCauserActor, OUT AActor** EventTargetActor);
+
 	float GetHealth() const;
+	float GetMaxHealth() const;
 	float GetDefense() const;
 	float GetPower() const;
 	float GetSpeed() const;

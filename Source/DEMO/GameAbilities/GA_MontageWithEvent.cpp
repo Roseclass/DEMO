@@ -2,6 +2,8 @@
 #include "Global.h"
 #include "GameplayTagContainer.h"
 
+#include "Characters/TurnBasedCharacter.h"
+
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AT_MontageNotifyEvent.h"
 
@@ -15,10 +17,14 @@ UGA_MontageWithEvent::UGA_MontageWithEvent()
 void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	InitAbility();
+}
 
+void UGA_MontageWithEvent::InitAbility()
+{
 	MontageDataIdx = 0;
 	CameraMoveDataIdx = 0;
-	// 몽타주를 재생하고 이벤트를 기다린다
+
 	FTimerHandle WaitHandle;
 	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
 		{
@@ -66,7 +72,11 @@ void UGA_MontageWithEvent::ApplyCameraMove()
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 	FGameplayCueParameters gameplayCueParameters;
 
-	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
+	FCameraMoveEffectContext* context = static_cast<FCameraMoveEffectContext*>(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
+	context->ShotOriginActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->TargetActors.Add(asc->GetTarget());
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
 	gameplayCueParameters.EffectContext.AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
 
 	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);

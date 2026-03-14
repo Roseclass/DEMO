@@ -23,9 +23,9 @@ void UGA_Dead::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 
-	if (EventTag == EndTag)
+	if (EventTag == FGameplayTag::RequestGameplayTag("Skill.System.Dead"))
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		//EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		asc->BroadcastOnDeadSequenceEnd();
 		return;
 	}

@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
-#include "GameAbilities/GameplayEffectContexts.h"
 #include "GameAbilities/GameplayEffectPayloads.h"
 #include "TurnBasedPhaseManager.generated.h"
 
@@ -24,7 +23,9 @@ UENUM()
 enum class EActionStage : uint8
 {
 	FindNextTurn,
+	HandleDoTDamage,
 	FocusSelect,
+	PrePlaySequence,
 	PlaySequence,
 	EndTurn,
 	FindDeadCharacter,
@@ -78,8 +79,6 @@ private:
 	void TrySpawnCharacter();
 	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 	void PlaceActorsOnField();
-	void ReduceCooldown();
-	void HandleDoTDamage();
 
 	EReservedActionType ConsumeAfterCurrentAction();
 	EReservedActionType ConsumeStartOfNextTurn();
@@ -87,8 +86,10 @@ private:
 
 	UFUNCTION()void HandleStageTransition();
 	void FindNextTurn();
+	void ReduceCooldown();
+	void HandleDoTDamage();
 	void FocusSelect();
-	void PlaySequence();
+	void PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, ATurnBasedCharacter* Target, bool Extra = 0);
 	UFUNCTION()void EndTurn();
 
 	UFUNCTION()void ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget);
@@ -111,6 +112,8 @@ public:
 public: // for subsystem
 	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
 	void ReserveAction(const FPayloadContext* InEffectContext);
+	void ApplyGE(const FPayloadContext* InEffectContext);
+	void ChangeTarget(ATurnBasedCharacter* InTarget);
 
 	const TSet<ATurnBasedCharacter*>& GetPlayerCharacters() const;
 	const TSet<ATurnBasedCharacter*>& GetEnemyCharacters() const;

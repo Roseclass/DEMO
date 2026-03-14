@@ -16,6 +16,18 @@ void UAbilityComponent::BeginPlay()
 	Super::BeginPlay();
 }
 
+FActiveGameplayEffectHandle UAbilityComponent::ApplyGameplayEffectSpecToSelf(const FGameplayEffectSpec& GameplayEffect, FPredictionKey PredictionKey)
+{
+	FActiveGameplayEffectHandle activeEffectHandle = Super::ApplyGameplayEffectSpecToSelf(GameplayEffect, PredictionKey);
+	const FActiveGameplayEffect* activeEffect = GetActiveGameplayEffect(activeEffectHandle);
+	if (activeEffect)
+	{
+		if (activeEffect->Spec.DynamicAssetTags.HasTag(FGameplayTag::RequestGameplayTag("Effect.Damage.DoT")))
+			DoTDamageHandles.Add(activeEffectHandle);
+	}
+	return activeEffectHandle;
+}
+
 void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 {
 	for (auto i : NewGAs)
@@ -32,13 +44,17 @@ void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 	//OnGameplayEffectAppliedDelegateToSelf.AddUFunction(this, "HitReaction");
 }
 
-void UAbilityComponent::InitAttributes(const FAttributeInitialInfo* NewStats)
+void UAbilityComponent::InitAttributes(const FAttributeInitialInfos* NewStats)
 {
 	for (auto i : NewStats->InitalStats)
 	{
 		UGameplayEffect* GE = NewObject<UGameplayEffect>(this);
 		GE->DurationPolicy = EGameplayEffectDurationType::Instant;
-		GE->Modifiers.Add(i);
+		FGameplayModifierInfo info;
+		info.Attribute = i.Attribute;
+		info.ModifierOp = EGameplayModOp::Override;
+		info.ModifierMagnitude = FScalableFloat(i.Stat);
+		GE->Modifiers.Add(info);
 		FGameplayEffectContextHandle context = MakeEffectContext();
 		FGameplayEffectSpec Spec(GE, context);
 		ApplyGameplayEffectSpecToSelf(Spec);
@@ -47,7 +63,9 @@ void UAbilityComponent::InitAttributes(const FAttributeInitialInfo* NewStats)
 
 void UAbilityComponent::PlayDeadSequence()
 {
-	CLog::Print("PlayDeadSequence");
+	FGameplayTagContainer tags;
+	tags.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.Dead"));
+	TryActivateAbilitiesByTag(tags);
 }
 
 void UAbilityComponent::BroadcastOnSkillEnd()
@@ -57,14 +75,58 @@ void UAbilityComponent::BroadcastOnSkillEnd()
 
 void UAbilityComponent::BroadcastOnDeadSequenceEnd()
 {
-	OnDeadSequenceEnd.Broadcast();
+	FTimerHandle WaitHandle;
+	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
+		{
+		OnDeadSequenceEnd.Broadcast();
+		}), 0.5, false);
 }
+
+void UAbilityComponent::GetAllDoTDamageHandles(OUT TArray<FActiveGameplayEffectHandle>& OutHandles)
+{
+	TArray<FActiveGameplayEffectHandle> remove;
+	for (auto handle : DoTDamageHandles)
+	{
+		if (!GetActiveGameplayEffect(handle))
+			remove.Add(handle);
+		else
+			OutHandles.Add(handle);
+	}
+
+	for (auto handle : remove)
+		DoTDamageHandles.Remove(handle);
+}
+
+void UAbilityComponent::HandleDoTDamage(FActiveGameplayEffectHandle InHandle, OUT AActor** EventCauserActor, OUT AActor** EventTargetActor)
+{
+	if (!DoTDamageHandles.Contains(InHandle))
+		CLog::Print("UAbilityComponent::HandleDoTDamage DoTDamageHandles NOT Contains InHandle!!");
+
+	const FActiveGameplayEffect* activeEffect = GetActiveGameplayEffect(InHandle);
+	CheckTrue_Print(!activeEffect, "activeEffect is nullptr!!");
+
+	FGameplayEffectSpec spec = activeEffect->Spec;
+	ActiveGameplayEffects.ExecuteActiveEffectsFrom(spec);
+
+	*EventCauserActor = spec.GetEffectContext().GetInstigator();
+	*EventTargetActor = GetAvatarActor();
+
+	RemoveActiveGameplayEffect(InHandle, 1);
+}
+
 
 float UAbilityComponent::GetHealth() const
 {
 	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));
 
 	return attribute->GetHealth();
+}
+
+float UAbilityComponent::GetMaxHealth() const
+{
+	const UAttributeSet_Character* attribute = Cast<UAttributeSet_Character>(GetAttributeSet(UAttributeSet_Character::StaticClass()));
+
+	return attribute->GetMaxHealth();
 }
 
 float UAbilityComponent::GetDefense() const

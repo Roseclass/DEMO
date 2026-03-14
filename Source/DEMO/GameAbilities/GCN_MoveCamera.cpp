@@ -1,10 +1,9 @@
 #include "GameAbilities/GCN_MoveCamera.h"
 #include "Global.h"
-#include "Objects/TurnBasedPhaseManager.h"
 
 #include "GameAbilities/GameplayEffectContexts.h"
 
-#include "Objects/TurnbasedPhaseCamera.h"
+#include "TurnBasedSubsystem.h"
 
 UGCN_MoveCamera::UGCN_MoveCamera()
 {
@@ -16,10 +15,8 @@ bool UGCN_MoveCamera::OnExecute_Implementation(AActor* MyTarget, const FGameplay
 	const FCameraMoveEffectContext* effectContext = static_cast<const FCameraMoveEffectContext*>(Parameters.EffectContext.Get());
 	if (!effectContext)return false;
 
-	ATurnbasedPhaseCamera* camera = Cast<ATurnbasedPhaseCamera>(UGameplayStatics::GetActorOfClass(GetWorld(), CameraActorClass));
-	if (!camera)return false;
-	
-	camera->ApplyCameraMove(effectContext);
+	UTurnBasedSubsystem* TBS = GetWorld()->GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
+	TBS->ApplyCameraMove(effectContext);
 
 	return false;
 }

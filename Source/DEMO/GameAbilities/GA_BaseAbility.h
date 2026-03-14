@@ -23,8 +23,8 @@ public:
 private:
 protected:
 public:
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
-		EAbilityType AbilityType;
+	//UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
+	//	EAbilityType AbilityType;
 
 //function
 private:

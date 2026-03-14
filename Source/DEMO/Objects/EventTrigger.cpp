@@ -85,4 +85,5 @@ void AEventTrigger::Activate()
 void AEventTrigger::Deactivate()
 {
 	bAct = 0;
+	OverlappedActors.Empty();
 }

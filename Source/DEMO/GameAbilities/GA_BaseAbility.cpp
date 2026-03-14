@@ -17,8 +17,8 @@ void UGA_BaseAbility::OnAvatarSet(const FGameplayAbilityActorInfo * ActorInfo, c
 {
 	Super::OnAvatarSet(ActorInfo, Spec);
 
-	if (AbilityType == EAbilityType::Passive)
-	{
-		bool ActivatedAbility = ActorInfo->AbilitySystemComponent->TryActivateAbility(Spec.Handle, false);
-	}
+	//if (AbilityType == EAbilityType::Passive)
+	//{
+	//	bool ActivatedAbility = ActorInfo->AbilitySystemComponent->TryActivateAbility(Spec.Handle, false);
+	//}
 }

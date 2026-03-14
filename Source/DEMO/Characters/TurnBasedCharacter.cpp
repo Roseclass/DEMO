@@ -21,19 +21,32 @@ void ATurnBasedCharacter::BeginPlay()
 void ATurnBasedCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetAbilitySystemComponent());
+	if (GetGenericTeamId() == TEAMID_PLAYER)
+	{
+		FGameplayTagContainer tags;
+		asc->GetOwnedGameplayTags(tags);
+		for (auto i : tags)
+			CLog::Print(GetName() + i.ToString(), -1, 0, FColor::Silver);
+		CLog::Print(asc->GetHealth(), -1, 0, FColor::Purple);
+	}
 }
 
-void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
+void ATurnBasedCharacter::InitAssets(UPrimaryDataAsset* DA)
 {
-	Super::Init(NewSaveName, DA);
-
 	UTurnBasedCharacterData* turnbasedData = Cast<UTurnBasedCharacterData>(DA);
 	CheckTrue_Print(!turnbasedData, "turnbasedData cast Fail!!");
 
 	//init asset
-	GetMesh()->SetSkeletalMesh(turnbasedData->SkeletalMesh.Get());
+	GetMesh()->SetSkeletalMesh(turnbasedData->SkeletalMesh.LoadSynchronous());
 	GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
-	GetMesh()->SetAnimInstanceClass(turnbasedData->AnimBlueprint.Get());
+	GetMesh()->SetAnimInstanceClass(turnbasedData->AnimBlueprint.LoadSynchronous());
+}
+
+void ATurnBasedCharacter::InitGA(UPrimaryDataAsset* DA)
+{
+	UTurnBasedCharacterData* turnbasedData = Cast<UTurnBasedCharacterData>(DA);
+	CheckTrue_Print(!turnbasedData, "turnbasedData cast Fail!!");
 
 	USaveLoadSubsystem* SLS = GetGameInstance()->GetSubsystem<USaveLoadSubsystem>();
 	const FSaveUIData* uiData = &SLS->ReadGameData()->SavedPlayerUIDatas.FindOrAdd(turnbasedData->SkillRootTag);
@@ -46,14 +59,28 @@ void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 
 	//asc
 	TArray<FAbilitySpecInfo> abilities;
-	for (auto i : uiData->EquippedSkillTags)
+	for (auto tag : uiData->EquippedSkillTags)
 	{
-		if (!turnbasedData->GrantedAbilities.Contains(i))continue;
-		abilities.Add(turnbasedData->GrantedAbilities[i]);
+		if (!turnbasedData->AvailableAbilities.Contains(tag))continue;
+		if (!turnbasedData->AvailableAbilities[tag].AbilityClass)continue;
+		abilities.Add(turnbasedData->AvailableAbilities[tag]);
 	}
-	for (auto& i : abilities)i.SourceObject = turnbasedData;
+	for (auto& tuple : turnbasedData->GrantedAbilities)
+	{
+		if (!tuple.Value.AbilityClass)continue;
+		abilities.Add(tuple.Value);
+	}
+	for (auto& info : abilities)info.SourceObject = turnbasedData;
 	Ability->InitGA(abilities);
-	Ability->InitAttributes(&turnbasedData->AttributeInitialInfo);
+	Ability->InitAttributes(&turnbasedData->AttributeInitialInfos);
+}
+
+void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
+{
+	Super::Init(NewSaveName, DA);
+
+	InitAssets(DA);
+	InitGA(DA);
 }
 
 FGameplayTag ATurnBasedCharacter::GetDataTag() const
@@ -92,4 +119,21 @@ float ATurnBasedCharacter::GetSpeed() const
 float ATurnBasedCharacter::GetTurnGauge() const
 {
 	return Ability->GetTurnGauge();
+}
+
+void ATurnBasedCharacter::PrintAbilities()
+{
+	TArray<FGameplayAbilitySpecHandle>arr;
+	GetAbilitySystemComponent()->GetAllAbilities(arr);
+	for (auto& i : arr)
+	{
+		FGameplayAbilitySpec* spec = GetAbilitySystemComponent()->FindAbilitySpecFromHandle(i);
+		if (!spec->IsActive())continue;
+		CLog::Print(spec->Ability->AbilityTags.GetByIndex(0).ToString(), -1, 0, FColor::Black);
+	}
+}
+
+bool ATurnBasedCharacter::IsDead()
+{
+	return Ability->GetHealth() <= 1e-9;
 }
