@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameplayEffectExecutionCalculation.h"
 #include "GameAbilities/ExecutionContextTypes.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "Execution_ResolveEffectValue.generated.h"
 
 /**
@@ -23,22 +24,25 @@ public:
 private:
 	void HandleResolveRules(const FExecutionContext* InContext, OUT float& Additive, OUT float& Multiplier)const;
 	void HandleModifyData(const FExecutionContext* InContext, const FExecutionModifyData& InData, OUT float& Additive, OUT float& Multiplier)const;
+	void HandleCamerMoveContext(const FExecutionContext* InContext)const;
 protected:
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
 		TObjectPtr<UDataTable> ResolveRules;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
 		EExecutionResolveType ResolveType;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
 		FGameplayAttribute Attribute;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
 		float BaseValue;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Data")
 		TArray<FExecutionModifyData> ModifyDatas;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+		FPayloadContext CamerMoveContext;
 public:
 
 	//function

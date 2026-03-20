@@ -9,7 +9,6 @@
 /**
  * 
  */
-struct FCameraMoveEffectContext;
 struct FPayloadContext;
 struct FEffectEventContext;
 
@@ -52,7 +51,7 @@ public:
 	FTurnBasedFieldLayoutRow FindSoftByFieldId(ETurnBasedFieldId FieldId) const;
 
 public: // from manager
-	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
+	void ApplyCameraMove(const FPayloadContext* InEffectContext);
 	void ReserveAction(const FPayloadContext* InEffectContext);
 	void ApplyGE(const FPayloadContext* InEffectContext);
 	void SolveHitEvent(const FEffectEventContext* InEffectContext);

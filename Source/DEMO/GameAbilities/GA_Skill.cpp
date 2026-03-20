@@ -16,7 +16,6 @@ UGA_Skill::UGA_Skill()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NextDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
-	NextPayloadEventTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextPayloadEvent");
 	CHelpers::GetClass<UGameplayEffect>(&CooldownGameplayEffectClass, "Blueprint'/Game/GAS/GE/GE_Cooldown.GE_Cooldown_C'");
 }
 
@@ -138,7 +137,6 @@ void UGA_Skill::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGamepl
 void UGA_Skill::InitAbility()
 {
 	MontageDataIdx = 0;
-	CameraMoveDataIdx = 0;
 	DamageDealerDataIdx = 0;
 	PayloadEventDataIdx = 0;
 
@@ -148,11 +146,10 @@ void UGA_Skill::InitAbility()
 			FGameplayTagContainer tags;
 			tags.AddTag(EndTag);
 			tags.AddTag(NextMontageTriggerTag);
-			tags.AddTag(NextCameraMoveTriggerTag);
 			tags.AddTag(NextDamageDealerTriggerTag);
 			tags.AddTag(NextPayloadEventTriggerTag);
 			UAT_SkillNotifyEvent* task = UAT_SkillNotifyEvent::CreateSkillNotifyEvent(this, NAME_None, tags);
-			task->EventReceived.AddDynamic(this, &UGA_MontageWithEvent::EventReceived);
+			task->EventReceived.AddDynamic(this, &UGA_Skill::EventReceived);
 
 			// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
 			task->ReadyForActivation();
@@ -162,7 +159,7 @@ void UGA_Skill::InitAbility()
 			MontageDataIdx++;
 
 		}), MontageDatas[MontageDataIdx].StartDelay, false);
-	ApplyCameraMove();
+	ExecutePayloadEvent();
 }
 
 void UGA_Skill::SpawnDamageDealer()
@@ -178,25 +175,10 @@ void UGA_Skill::SpawnDamageDealer()
 	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
 }
 
-void UGA_Skill::ExecutePayloadEvent()
-{
-	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
-	FGameplayCueParameters gameplayCueParameters;
-
-	FPayloadContext* context = PayloadEventDatas[PayloadEventDataIdx++].Duplicate();
-	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
-	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
-	context->EventTargetActor = asc->GetTarget();
-
-	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
-	asc->ExecuteGameplayCue(context->GCNTag, gameplayCueParameters);
-}
-
 void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 
-	// 몽타주는 어빌리티가 끝나도 계속 재생된다.
 	if (EventTag == EndTag)
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -210,18 +192,13 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 		++MontageDataIdx;
 		return;
 	}
-	else if(EventTag == NextCameraMoveTriggerTag)
+	else if (EventTag == NextDamageDealerTriggerTag)
 	{
-		ApplyCameraMove();
-		return;
-	}
-	else if(EventTag == NextDamageDealerTriggerTag)
-	{		
 		SpawnDamageDealer();
 		return;
 	}
-	else if(EventTag == NextPayloadEventTriggerTag)
-	{		
+	else if (EventTag == NextPayloadEventTriggerTag)
+	{
 		ExecutePayloadEvent();
 		return;
 	}

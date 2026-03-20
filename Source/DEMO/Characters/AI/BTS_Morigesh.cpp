@@ -186,19 +186,19 @@ void UBTS_Morigesh::EvaluateTurnAction(UBehaviorTreeComponent& OwnerComp)
 
 	// Ç¥½ÄÀÌ ÂïÈù ÀûÀÌ ¾ø´Ù¸é Ç¥½Ä ¸ÕÀú Âï±â
 	{
-		blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.Attack").ToString());
-		//blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.Skill1").ToString());
-		//for (int32 i = 0; i < sort.Num(); i++)
-		//{
-		//	FGameplayTag markTag = FGameplayTag::RequestGameplayTag("Effect.Mark.Morigesh");
-		//	FGameplayTagContainer tags;
-		//	sort[i].Value->GetAbilitySystemComponent()->GetOwnedGameplayTags(tags);
-		//	if (tags.HasAnyExact(FGameplayTagContainer(markTag)))
-		//	{
-		//		targetIdx = i;
-		//		blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.Skill0").ToString());
-		//	}
-		//}
+		//blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.Attack").ToString());
+		blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.Mark").ToString());
+		for (int32 i = 0; i < sort.Num(); i++)
+		{
+			FGameplayTag markTag = FGameplayTag::RequestGameplayTag("Effect.Mark.Morigesh");
+			FGameplayTagContainer tags;
+			sort[i].Value->GetAbilitySystemComponent()->GetOwnedGameplayTags(tags);
+			if (tags.HasAnyExact(FGameplayTagContainer(markTag)))
+			{
+				targetIdx = i;
+				blackboardComp->SetValueAsString(TargetSkillTag.SelectedKeyName, FGameplayTag::RequestGameplayTag("Skill.Morigesh.DoT").ToString());
+			}
+		}
 	}
 	blackboardComp->SetValueAsObject(TargetCharacter.SelectedKeyName, sort[targetIdx].Value);
 

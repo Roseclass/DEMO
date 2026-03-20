@@ -15,7 +15,6 @@
 #include "GameAbilities/ExecutionContextTypes.h"
 #include "GameAbilities/GameplayEffectContexts.h"
 #include "GameAbilities/GE_InstantDamage.h"
-#include "GameAbilities/MMC_Damage.h"
 
 ADamageDealer::ADamageDealer()
 {
@@ -76,7 +75,7 @@ void ADamageDealer::ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComp
 		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);
 		EffectContextHandle.AddHitResult(SweepResult);
 
-		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(DamageGEClass, 1, EffectContextHandle);
+		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(DamageGEClass, UGameplayEffect::INVALID_LEVEL, EffectContextHandle);
 
 		InstigatorASC->ApplyGameplayEffectSpecToTarget(*EffectSpecHandle.Data, TargetASC);
 	}
@@ -84,31 +83,22 @@ void ADamageDealer::ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComp
 
 void ADamageDealer::ApplyAdditiveEffectData(UAbilityComponent* InstigatorASC, UAbilityComponent* TargetASC, const FHitResult& SweepResult)
 {
-	//TODO::데미지 따로 계산할수있게하기
-
 	CheckTrue(AdditiveEffectData.Rule == EDamageTriggerRule::NONE);
 	CheckTrue(AdditiveEffectData.Rule == EDamageTriggerRule::OnFirstHit && 0 < CurrentHitCount);
 	if (InstigatorASC && TargetASC)
 	{
-		// Make effectcontext handle
-		FDamageParameters params;
-		params.InstigatorPower = InstigatorASC->GetPower();
-		params.InstigatorSpeed = InstigatorASC->GetSpeed();
-		params.TargetDefense = TargetASC->GetDefense();
-		params.TargetHealth = TargetASC->GetHealth();
-		params.TargetMaxHealth = TargetASC->GetMaxHealth();
-
-		//float calculatedDamage = CalculateDamage(params);
-
-		FDamageEffectContext* context = new FDamageEffectContext();
-		//context->CalculatedDamage = calculatedDamage;
-		context->Location = TargetASC->GetAvatarActor()->GetActorLocation();
+		FExecutionContext* context = new FExecutionContext();
+		context->EffectCauserActor = InstigatorASC->GetAvatarActor();
+		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
+		context->EffectTargetActor = TargetASC->GetAvatarActor();
+		context->SkillCauserActor = InstigatorASC->GetAvatarActor();
+		context->SkillTargetActor = TargetASC->GetAvatarActor();
 
 		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);
 		EffectContextHandle.AddHitResult(SweepResult);
 
-		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(AdditiveEffectData.GEClass, 1, EffectContextHandle);
+		FGameplayEffectSpecHandle EffectSpecHandle = InstigatorASC->MakeOutgoingSpec(AdditiveEffectData.GEClass, UGameplayEffect::INVALID_LEVEL, EffectContextHandle);
 		EffectSpecHandle.Data.Get()->StackCount = AdditiveEffectData.StackCount;
 		EffectSpecHandle.Data.Get()->DynamicGrantedTags.AddTag(AdditiveEffectData.GrantedTag);
 

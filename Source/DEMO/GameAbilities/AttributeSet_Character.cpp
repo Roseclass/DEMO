@@ -4,8 +4,8 @@
 #include "GameplayEffectTypes.h"
 #include "GameplayCueManager.h"
 
+#include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/GameplayEffectContexts.h"
-
 
 UAttributeSet_Character::UAttributeSet_Character()
 {
@@ -28,21 +28,6 @@ void UAttributeSet_Character::PreAttributeChange(const FGameplayAttribute& Attri
 {
     Super::PreAttributeChange(Attribute, NewValue);    
 
-    //// If a Max value changes, adjust current to keep Current % of Current to Max
-    //if (Attribute == GetTimeDilationAttribute())
-    //{
-    //    AActor* OwningActor = Cast<AActor>(GetOwningAbilitySystemComponent()->GetOwner());
-    //    if (OwningActor)
-    //        OwningActor->CustomTimeDilation = NewValue;
-    //}
-    //else if (Attribute == GetMaxHealthAttribute())
-    //{
-    //    AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
-    //}
-    //else if (Attribute == GetMaxManaAttribute())
-    //{
-    //    AdjustAttributeForMaxChange(Mana, MaxMana, NewValue, GetManaAttribute());
-    //}
 }
 
 void UAttributeSet_Character::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -59,14 +44,31 @@ void UAttributeSet_Character::PostGameplayEffectExecute(const FGameplayEffectMod
 
     if (Data.EvaluatedData.Attribute == GetHealthAttribute())
     {
-        FDamageEffectContext* context = new FDamageEffectContext();
-        context->CalculatedDamage = FMath::Abs(Data.EvaluatedData.Magnitude);
-        context->Location = OwningActor->GetActorLocation();
+        // damagetext
+        {
+            FDamageEffectContext* context = new FDamageEffectContext();        
+            context->CalculatedDamage = FMath::Abs(Data.EvaluatedData.Magnitude);
+            context->Location = OwningActor->GetActorLocation();
 
-        FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
-        EffectContextHandle.AddInstigator(Data.EffectSpec.GetContext().GetInstigator(), Data.EffectSpec.GetContext().GetEffectCauser());
+            FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
+            EffectContextHandle.AddInstigator(Data.EffectSpec.GetContext().GetInstigator(), Data.EffectSpec.GetContext().GetEffectCauser());
 
-        GetOwningAbilitySystemComponent()->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.DamageText"), EffectContextHandle);
+            GetOwningAbilitySystemComponent()->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.DamageText"), EffectContextHandle);
+        }
+
+        {
+            UAbilityComponent* asc = Cast<UAbilityComponent>(GetOwningAbilitySystemComponent());
+            if (asc && GetHealth() <= 0.f)
+            {
+                //사망예약
+                asc->RegisterPendingDeadArray();
+            }
+            else if (asc && Data.EvaluatedData.Magnitude < 0.f)
+            {
+                //맞는모션재생
+                asc->BeginHitAbility();
+            }
+        }
 
         SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
     }

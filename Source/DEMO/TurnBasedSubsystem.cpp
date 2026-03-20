@@ -158,7 +158,7 @@ FTurnBasedFieldLayoutRow UTurnBasedSubsystem::FindSoftByFieldId(ETurnBasedFieldI
 	return *LevelDatas[FieldId];
 }
 
-void UTurnBasedSubsystem::ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext)
+void UTurnBasedSubsystem::ApplyCameraMove(const FPayloadContext* InEffectContext)
 {
 	Manager->ApplyCameraMove(InEffectContext);
 }

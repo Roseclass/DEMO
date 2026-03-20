@@ -14,7 +14,6 @@
 #include "GameAbilities/AbilityComponent.h"
 #include "GameAbilities/AttributeSet_Character.h"
 #include "GameAbilities/GameplayEffectContexts.h"
-#include "GameAbilities/MMC_Damage.h"
 
 
 AProjectile::AProjectile()

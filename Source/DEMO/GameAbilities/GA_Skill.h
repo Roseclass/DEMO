@@ -37,10 +37,6 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FSpawnDamageDealerContext> DamageDealerDatas;
 
-	int32 PayloadEventDataIdx;
-	UPROPERTY(EditAnywhere, Category = "Data")
-		TArray<FPayloadContext> PayloadEventDatas;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
 		ESkillTargetType TargetType;
 
@@ -60,9 +56,6 @@ public:
 		FGameplayTag NextDamageDealerTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
-		FGameplayTag NextPayloadEventTriggerTag;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTagContainer CooldownTags;
 
 
@@ -72,7 +65,6 @@ protected:
 	virtual void InitAbility()override;
 
 	virtual void SpawnDamageDealer();
-	virtual void ExecutePayloadEvent();
 	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)override;
 

@@ -10,8 +10,8 @@
 UGA_MontageWithEvent::UGA_MontageWithEvent()
 {
 	EndTag = FGameplayTag::RequestGameplayTag("Skill.System.End");
-	NextCameraMoveTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextCameraMove");
 	NextMontageTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextMontage");
+	NextPayloadEventTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextPayloadEvent");
 }
 
 void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -23,7 +23,7 @@ void UGA_MontageWithEvent::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 void UGA_MontageWithEvent::InitAbility()
 {
 	MontageDataIdx = 0;
-	CameraMoveDataIdx = 0;
+	PayloadEventDataIdx = 0;
 
 	FTimerHandle WaitHandle;
 	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
@@ -50,7 +50,7 @@ void UGA_MontageWithEvent::InitAbility()
 			MontageDataIdx++;
 
 		}), MontageDatas[MontageDataIdx].StartDelay, false);
-	ApplyCameraMove();
+	ExecutePayloadEvent();
 }
 
 void UGA_MontageWithEvent::PlayKeyMontage()
@@ -66,20 +66,19 @@ void UGA_MontageWithEvent::PlaySubMontages()
 		asc->PlayMontage(this, GetCurrentActivationInfo(), montage, MontageDatas[MontageDataIdx].PlayRate, MontageDatas[MontageDataIdx].StartSection);
 }
 
-void UGA_MontageWithEvent::ApplyCameraMove()
+void UGA_MontageWithEvent::ExecutePayloadEvent()
 {
-	CheckTrue(CameraMoveDatas.IsEmpty());
+	CheckTrue(!PayloadEventDatas.IsValidIndex(PayloadEventDataIdx));
 	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
 	FGameplayCueParameters gameplayCueParameters;
 
-	FCameraMoveEffectContext* context = static_cast<FCameraMoveEffectContext*>(CameraMoveDatas[CameraMoveDataIdx++].Duplicate());
-	context->ShotOriginActor = GetCurrentActorInfo()->AvatarActor.Get();
-	context->TargetActors.Add(asc->GetTarget());
+	FPayloadContext* context = PayloadEventDatas[PayloadEventDataIdx++].Duplicate();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventTargetActor = asc->GetTarget();
 
 	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
-	gameplayCueParameters.EffectContext.AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
-
-	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);
+	asc->ExecuteGameplayCue(context->GCNTag, gameplayCueParameters);
 }
 
 void UGA_MontageWithEvent::OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData)
@@ -96,4 +95,16 @@ void UGA_MontageWithEvent::EventReceived(FGameplayTag EventTag, FGameplayEventDa
 {
 	if (EventTag == EndTag)
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	else if (EventTag == NextMontageTriggerTag)
+	{
+		PlayKeyMontage();
+		PlaySubMontages();
+		++MontageDataIdx;
+		return;
+	}
+	else if (EventTag == NextPayloadEventTriggerTag)
+	{
+		ExecutePayloadEvent();
+		return;
+	}
 }

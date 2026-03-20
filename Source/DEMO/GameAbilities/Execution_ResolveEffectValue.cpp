@@ -28,6 +28,7 @@ void UExecution_ResolveEffectValue::Execute_Implementation(const FGameplayEffect
 		HandleModifyData(context, data, tempAdditive, tempMultiplier);
 
 	HandleResolveRules(context, tempAdditive, tempMultiplier);
+	HandleCamerMoveContext(context);
 
 	FGameplayModifierEvaluatedData data;
 	data.Attribute = Attribute;
@@ -133,4 +134,25 @@ void UExecution_ResolveEffectValue::HandleModifyData(const FExecutionContext* In
 	case EExecutionModifyOp::MultiplyFromMeasuredValue:Multiplier *= (cnt * InData.Value); break;
 	default:break;
 	}
+}
+
+void UExecution_ResolveEffectValue::HandleCamerMoveContext(const FExecutionContext* InContext)const
+{
+	CheckTrue(!CamerMoveContext.GCNTag.IsValid());
+	CheckTrue(!CamerMoveContext.Payload);
+
+	ATurnBasedCharacter* ref = Cast<ATurnBasedCharacter>(InContext->EffectCauserActor.Get());;
+	CheckTrue_Print(!ref, "target cast FAILED!!");
+
+	UAbilityComponent* asc = Cast<UAbilityComponent>(ref->GetAbilitySystemComponent());
+	CheckTrue_Print(!asc, "asc cast FAILED!!");
+
+	FGameplayCueParameters gameplayCueParameters;
+	FPayloadContext* context = CamerMoveContext.Duplicate();
+	context->RuleSourceActor = InContext->EffectSourceActor.Get();
+	context->EventCauserActor = InContext->EffectCauserActor.Get();
+	context->EventTargetActor= InContext->EffectTargetActor.Get();
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(CamerMoveContext.GCNTag, gameplayCueParameters);
 }

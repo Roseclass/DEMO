@@ -30,6 +30,14 @@ void ATurnBasedCharacter::Tick(float DeltaTime)
 			CLog::Print(GetName() + i.ToString(), -1, 0, FColor::Silver);
 		CLog::Print(asc->GetHealth(), -1, 0, FColor::Purple);
 	}
+	if (GetGenericTeamId() == TEAMID_ENEMY)
+	{
+		FGameplayTagContainer tags;
+		asc->GetOwnedGameplayTags(tags);
+		for (auto i : tags)
+			CLog::Print(GetName() + i.ToString(), -1, 0, FColor::Black);
+		CLog::Print(asc->GetHealth(), -1, 0, FColor::Green);
+	}
 }
 
 void ATurnBasedCharacter::InitAssets(UPrimaryDataAsset* DA)

@@ -14,6 +14,7 @@ class ATurnBasedCharacter;
 struct FAttributeInitialInfos;
 
 DECLARE_MULTICAST_DELEGATE(FAbilityComponentSignature);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnRegisterPendingDeadArray, AActor*);
 
 UCLASS()
 class DEMO_API UAbilityComponent : public UAbilitySystemComponent
@@ -29,11 +30,25 @@ public:
 	//property
 private:
 	ATurnBasedCharacter* Target;
+
+	FGameplayTag StateTag_Dead;
+	FGameplayTag StateTag_Hit;
+	FGameplayTag StateTag_StunStart;
+	FGameplayTag StateTag_StunEnd;
+
+	TSet<FGameplayAbilitySpecHandle> GAHandles;
+	TMap<FGameplayTag, FGameplayAbilitySpecHandle> StateGAHandles;
+	FGameplayTagContainer CooldownTags;
+	TSet<FActiveGameplayEffectHandle> CooldownHandles;
+	TSet<FActiveGameplayEffectHandle> BuffHandles;
+	TSet<FActiveGameplayEffectHandle> DebuffHandles;
+	TSet<FActiveGameplayEffectHandle> CCHandles;
 	TSet<FActiveGameplayEffectHandle> DoTDamageHandles;
 protected:
 public:
 	FAbilityComponentSignature OnSkillEnd;
 	FAbilityComponentSignature OnDeadSequenceEnd;
+	FOnRegisterPendingDeadArray OnRegisterPendingDeadArray;
 
 	//function
 private:
@@ -41,13 +56,23 @@ protected:
 public:
 	void InitGA(const TArray<FAbilitySpecInfo>& NewGAs);
 	void InitAttributes(const FAttributeInitialInfos* NewStats);
-	void PlayDeadSequence();
+
+	//with TurnBased
+	void RegisterPendingDeadArray();
+	void BeginDeadAbility();
+	void BeginHitAbility();
+	void EndStunAbility();
 	void BroadcastOnSkillEnd();
 	void BroadcastOnDeadSequenceEnd();
 
-	//with TurnBased
 	void GetAllDoTDamageHandles(OUT TArray<FActiveGameplayEffectHandle>& OutHandles);
+	void HandleCooldown();
+	void HandleBuff();
+	void HandleDebuff();
+	void HandleCC();
 	void HandleDoTDamage(FActiveGameplayEffectHandle InHandle, OUT AActor** EventCauserActor, OUT AActor** EventTargetActor);
+
+	bool HasTurnBlockingCC();
 
 	float GetHealth() const;
 	float GetMaxHealth() const;

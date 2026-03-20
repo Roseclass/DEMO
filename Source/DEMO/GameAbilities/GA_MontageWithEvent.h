@@ -50,16 +50,15 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FGameAbilityMontageData> MontageDatas;
 
-	int32 CameraMoveDataIdx;
+	int32 PayloadEventDataIdx;
 	UPROPERTY(EditAnywhere, Category = "Data")
-		TArray<FCameraMoveEffectContext> CameraMoveDatas;
-
+		TArray<FPayloadContext> PayloadEventDatas;
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag NextMontageTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
-		FGameplayTag NextCameraMoveTriggerTag;
+		FGameplayTag NextPayloadEventTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag EndTag;
@@ -70,7 +69,8 @@ protected:
 	virtual void InitAbility();
 	virtual void PlayKeyMontage();
 	virtual void PlaySubMontages();
-	virtual void ApplyCameraMove();
+	virtual void ExecutePayloadEvent();
+
 	UFUNCTION()virtual void OnCancelled(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void OnCompleted(FGameplayTag EventTag, FGameplayEventData EventData);
 	UFUNCTION()virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData);

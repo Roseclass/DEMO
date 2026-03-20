@@ -109,8 +109,17 @@ public:
 		saveGameData->SavedPlayerDatas[key].Transform.SetTranslation(FVector(900, 1120, 96));
 		saveGameData->SavedPlayerDatas[key].Transform.SetRotation(FQuat4d(FRotator(0, 0, 0)));
 
-		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Gideon"));
-		saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Revenant"));
+		FSaveUIData& gideon = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Gideon"));
+		gideon.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Gideon.Attack");
+		gideon.EquippedSkillTags[int32(ESkillSlotLocation::Skill_0)] = FGameplayTag::RequestGameplayTag("Skill.Gideon.Buff");
+		gideon.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Gideon.Debuff");
+		gideon.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Gideon.GrantExtraTurn");
+
+		FSaveUIData& revenant = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Revenant"));
+		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.Attack");
+		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Skill_0)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.Cast");
+		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.CastMassive");
+		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.CastUlt");
 
 		FSaveUIData& terra = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Terra"));
 		terra.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Terra.Attack");

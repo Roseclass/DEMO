@@ -3,12 +3,13 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Engine/DataTable.h"
-#include "GameAbilities/GameplayEffectContexts.h"
+#include "GameAbilities/GameplayEffectPayloads.h"
 #include "TurnbasedPhaseCamera.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 class ATurnBasedCharacter;
+class UDA_MoveCamera;
 
 USTRUCT(BlueprintType)
 struct FCameraPreset : public FTableRowBase
@@ -51,7 +52,8 @@ private:
 	float BlendTime;
 	float ElapsedTime;
 
-	FCameraMoveEffectContext CurrentMoveEffect;
+	AActor* ShotOrigin;
+	UDA_MoveCamera* CurrentDA;
 protected:
 	//scene
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -79,5 +81,5 @@ public:
 	void SetTargetRotation(FRotator NewRotation);
 	bool IsRotating()const;
 
-	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
+	void ApplyCameraMove(const FPayloadContext* InEffectContext);
 };

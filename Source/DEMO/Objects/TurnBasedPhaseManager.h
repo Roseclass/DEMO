@@ -23,7 +23,10 @@ UENUM()
 enum class EActionStage : uint8
 {
 	FindNextTurn,
+	HandleEffects,
+	FindDoTDamage,
 	HandleDoTDamage,
+	HandleCC,
 	FocusSelect,
 	PrePlaySequence,
 	PlaySequence,
@@ -51,6 +54,7 @@ private:
 
 	EActionStage CurrentStage = EActionStage::MAX;
 	EActionStage NextStage = EActionStage::MAX;
+	TArray<FActiveGameplayEffectHandle> DoTHandles;
 
 	TMap<EReservedActionTiming, TArray<FPayloadContext>>ReservedActions;
 
@@ -86,8 +90,10 @@ private:
 
 	UFUNCTION()void HandleStageTransition();
 	void FindNextTurn();
-	void ReduceCooldown();
+	void HandleEffects();
+	void FindDoTDamage();
 	void HandleDoTDamage();
+	void HandleCC();
 	void FocusSelect();
 	void PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, ATurnBasedCharacter* Target, bool Extra = 0);
 	UFUNCTION()void EndTurn();
@@ -110,7 +116,7 @@ public:
 	void RequestSpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 
 public: // for subsystem
-	void ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext);
+	void ApplyCameraMove(const FPayloadContext* InEffectContext);
 	void ReserveAction(const FPayloadContext* InEffectContext);
 	void ApplyGE(const FPayloadContext* InEffectContext);
 	void ChangeTarget(ATurnBasedCharacter* InTarget);

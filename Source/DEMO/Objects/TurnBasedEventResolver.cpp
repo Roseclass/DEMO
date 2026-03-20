@@ -99,7 +99,9 @@ void ATurnBasedEventResolver::SolveEvent(const FEffectEventContext* InEffectCont
 	asc->GetAllActiveGameplayEffectSpecs(specs);
 	for (const auto& spec : specs)
 	{
-		for (const auto& tag : spec.Def->InheritableOwnedTagsContainer.CombinedTags)
+		FGameplayTagContainer tags;
+		spec.GetAllGrantedTags(tags);
+		for (const auto& tag : tags)
 		{
 			const TArray<FEffectEventRule*>* rules = RuleMap.Find(tag);
 			if (!rules)continue;
