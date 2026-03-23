@@ -69,7 +69,8 @@ void ADamageDealer::ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComp
 		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
 		context->EffectTargetActor = TargetASC->GetAvatarActor();
 		context->SkillCauserActor = InstigatorASC->GetAvatarActor();
-		context->SkillTargetActor = TargetASC->GetAvatarActor();
+		for (auto ch : InstigatorASC->GetTargets())
+			context->SkillTargetActors.Add(ch);
 
 		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);
@@ -92,7 +93,8 @@ void ADamageDealer::ApplyAdditiveEffectData(UAbilityComponent* InstigatorASC, UA
 		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
 		context->EffectTargetActor = TargetASC->GetAvatarActor();
 		context->SkillCauserActor = InstigatorASC->GetAvatarActor();
-		context->SkillTargetActor = TargetASC->GetAvatarActor();
+		for (auto ch : InstigatorASC->GetTargets())
+			context->SkillTargetActors.Add(ch);
 
 		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 		EffectContextHandle.AddInstigator(InstigatorASC->GetAvatarActor(), this);

@@ -117,7 +117,6 @@ public:
     TWeakObjectPtr<AActor> RuleSourceActor;     // 규칙/상태를 제공한 주체
     TWeakObjectPtr<AActor> EventCauserActor;    // 트리거 사건 유발자
     TWeakObjectPtr<AActor> EventTargetActor;    // 현재 이벤트 대상
-    TArray<TWeakObjectPtr<AActor>> EventTargetActors;    // 현재 이벤트 대상이 여럿이라면
 };
 
 USTRUCT(BlueprintType)
@@ -137,6 +136,6 @@ public:
         return NewContext;
     }
 public:
-    TWeakObjectPtr<AActor> EventCauserActor;    // 트리거 사건 유발자
-    TWeakObjectPtr<AActor> EventTargetActor;    // 현재 이벤트 대상
+    TWeakObjectPtr<AActor> EventCauserActor;            // 트리거 사건 유발자
+    TWeakObjectPtr<AActor> EventTargetActor;            // 현재 이벤트 대상
 };

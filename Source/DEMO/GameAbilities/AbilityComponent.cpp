@@ -4,7 +4,7 @@
 #include "Characters/TurnBasedCharacterData.h"
 
 #include "GameAbilities/AttributeSet_Character.h"
-#include "GameAbilities/GA_BaseAbility.h"
+#include "GameAbilities/GA_Skill.h"
 
 UAbilityComponent::UAbilityComponent()
 {
@@ -66,10 +66,14 @@ void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 		FGameplayAbilitySpec* spec = FindAbilitySpecFromHandle(handle);
 		if (!spec)continue;		
 
+		if (const UGA_Skill* skill = Cast<UGA_Skill>(spec->Ability))
+			SkillGAHandles.FindOrAdd(skill->GetSkillTag()) = handle;
+
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_Dead))StateGAHandles.FindOrAdd(StateTag_Dead) = handle;
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_Hit))StateGAHandles.FindOrAdd(StateTag_Hit) = handle;
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_StunStart))StateGAHandles.FindOrAdd(StateTag_StunStart) = handle;
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_StunEnd))StateGAHandles.FindOrAdd(StateTag_StunEnd) = handle;
+
 
 		//쿨다운 태그 저장
 		if (spec->Ability->GetCooldownTags() && !spec->Ability->GetCooldownTags()->IsEmpty())
@@ -233,6 +237,19 @@ void UAbilityComponent::HandleCC()
 
 	if (CCHandles.IsEmpty() && bStuned)
 		EndStunAbility();
+}
+
+void UAbilityComponent::GetSkillCooldownTimeRemainingAndDuration(FGameplayTag InSkillTag, OUT float& TimeRemaining, OUT float& CooldownDuration)
+{
+	CheckTrue_Print(!SkillGAHandles.Contains(InSkillTag), " SkillGAHandles not contains InSkillTag!!");
+
+	FGameplayAbilitySpec* spec = FindAbilitySpecFromHandle(SkillGAHandles[InSkillTag]);
+	spec->Ability->GetCooldownTimeRemainingAndDuration(SkillGAHandles[InSkillTag],AbilityActorInfo.Get(), TimeRemaining, CooldownDuration);
+}
+
+FGameplayAbilitySpec* UAbilityComponent::FindAbilitySpecFromSkillTag(FGameplayTag InSkillTag)
+{
+	return SkillGAHandles.Contains(InSkillTag) ? FindAbilitySpecFromHandle(SkillGAHandles[InSkillTag]) : nullptr;
 }
 
 void UAbilityComponent::HandleDoTDamage(FActiveGameplayEffectHandle InHandle, OUT AActor** EventCauserActor, OUT AActor** EventTargetActor)

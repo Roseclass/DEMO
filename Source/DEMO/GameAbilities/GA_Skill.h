@@ -21,6 +21,8 @@ public:
 	UGA_Skill();
 protected:
 public:
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent);
+
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual float GetCooldownTimeRemaining(const FGameplayAbilityActorInfo* ActorInfo) const override;
@@ -39,6 +41,9 @@ protected:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
 		ESkillTargetType TargetType;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Ability")
+		float GoalCount = 1;
 
 	UPROPERTY(EditAnywhere, Category = "Condition|Cost")
 		FScalableFloat CostBase;
@@ -75,6 +80,7 @@ protected:
 public:
 	FORCEINLINE FGameplayTag GetSkillTag() const { return SkillTag; }
 	FORCEINLINE ESkillTargetType GetTargetType() const { return TargetType; }
+	FORCEINLINE float GetGoalCount() const { return GoalCount; }
 	TArray<float> GetCalculatedDamages(int32 InLevel, float InPower)const;
 };
 

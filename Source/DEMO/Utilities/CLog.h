@@ -25,6 +25,6 @@ public:
 #define CheckTrue_Print(Condition, Message) \
 if (Condition) \
 { \
-    CLog::Print(FString::Printf(TEXT("%s %s"), *FString(__FUNCTION__), TEXT(Message))); \
+    CLog::Print(FString::Printf(TEXT("%s %s"), *FString(__FUNCTION__), TEXT(Message)),-1,10,FColor::Red); \
     return; \
 }

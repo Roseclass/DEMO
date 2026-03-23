@@ -25,7 +25,21 @@ enum class EExecutionResolveType : uint8
 UENUM(BlueprintType)
 enum class EExecutionReferenceActorType : uint8
 {
-    EffectSource, EffectTarget, EffectCauser, SkillTarget, SkillCauser, 
+    EffectSource, EffectTarget, EffectCauser, SkillTargets, SkillCauser, 
+    MAX UMETA(Hidden)
+};
+
+UENUM(BlueprintType)
+enum class EExecutionSelectType : uint8
+{
+    All, Top, Bottom, Random,
+    MAX UMETA(Hidden)
+};
+
+UENUM(BlueprintType)
+enum class EExecutionAggregationType : uint8
+{
+    Sum, Average,
     MAX UMETA(Hidden)
 };
 
@@ -85,7 +99,7 @@ public:
     TWeakObjectPtr<AActor> EffectCauserActor;   // 이펙트 생성 액터
     TWeakObjectPtr<AActor> EffectTargetActor;   // 이펙트 적용 액터
     TWeakObjectPtr<AActor> SkillCauserActor;    // 스킬 시전 액터
-    TWeakObjectPtr<AActor> SkillTargetActor;    // 스킬 대상 액터
+    TArray<TWeakObjectPtr<AActor>> SkillTargetActors;    // 스킬 대상 액터
 };
 
 USTRUCT(BlueprintType)
@@ -95,6 +109,15 @@ struct FExecutionModifyData
 public:
     UPROPERTY(EditDefaultsOnly)
         EExecutionReferenceActorType ReferenceActor;
+
+    UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ReferenceActor == EExecutionMeasureType::SkillTargets", EditConditionHides))
+        EExecutionSelectType SkillTargetSelectType;
+
+    UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ReferenceActor == EExecutionMeasureType::SkillTargets", EditConditionHides))
+        EExecutionAggregationType SkillTargetAggregationType;
+
+    UPROPERTY(EditDefaultsOnly, meta = (EditCondition = "ReferenceActor == EExecutionMeasureType::SkillTargets && SkillTargetSelectType != EExecutionSelectType::All", EditConditionHides))
+        float ReferenceActorCount;
 
     UPROPERTY(EditDefaultsOnly)
         EExecutionMeasureType MeasureType;

@@ -29,7 +29,7 @@ public:
 
 	//property
 private:
-	ATurnBasedCharacter* Target;
+	TArray<ATurnBasedCharacter*> Targets;
 
 	FGameplayTag StateTag_Dead;
 	FGameplayTag StateTag_Hit;
@@ -38,6 +38,7 @@ private:
 
 	TSet<FGameplayAbilitySpecHandle> GAHandles;
 	TMap<FGameplayTag, FGameplayAbilitySpecHandle> StateGAHandles;
+	TMap<FGameplayTag, FGameplayAbilitySpecHandle> SkillGAHandles;
 	FGameplayTagContainer CooldownTags;
 	TSet<FActiveGameplayEffectHandle> CooldownHandles;
 	TSet<FActiveGameplayEffectHandle> BuffHandles;
@@ -64,6 +65,8 @@ public:
 	void EndStunAbility();
 	void BroadcastOnSkillEnd();
 	void BroadcastOnDeadSequenceEnd();
+	void GetSkillCooldownTimeRemainingAndDuration(FGameplayTag InSkillTag, OUT float& TimeRemaining, OUT float& CooldownDuration);
+	FGameplayAbilitySpec* FindAbilitySpecFromSkillTag(FGameplayTag InSkillTag);
 
 	void GetAllDoTDamageHandles(OUT TArray<FActiveGameplayEffectHandle>& OutHandles);
 	void HandleCooldown();
@@ -81,8 +84,8 @@ public:
 	float GetSpeed() const;
 	float GetTurnGauge() const;
 
-	FORCEINLINE void SetTarget(ATurnBasedCharacter* InTarget) { Target = InTarget; }
-	FORCEINLINE ATurnBasedCharacter* GetTarget() const { return Target; }
+	FORCEINLINE void SetTargets(TArray<ATurnBasedCharacter*> InTargets) { Targets = InTargets; }
+	FORCEINLINE TArray<ATurnBasedCharacter*> GetTargets() const { return Targets; }
 };
 
 

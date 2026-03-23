@@ -4,9 +4,31 @@
 #include "GameAbilities/GA_MontageWithEvent.h"
 #include "GAPresets.generated.h"
 
-/**
- * 
- */
+UCLASS()
+class DEMO_API UGA_Dead : public UGA_MontageWithEvent
+{
+	GENERATED_BODY()
+public:
+	UGA_Dead()
+	{
+		AbilityTags.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.Dead"));
+
+		CancelAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.Hit"));
+		CancelAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.StunStart"));
+		CancelAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.StunEnd"));
+
+		BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.Dead"));
+		BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.Hit"));
+		BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.StunStart"));
+		BlockAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag("Skill.System.StunEnd"));
+
+		ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag("State.Dead"));
+
+		ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag("State.Dead"));
+	};
+	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
+};
+
 UCLASS()
 class DEMO_API UGA_Hit : public UGA_MontageWithEvent
 {

@@ -9,6 +9,7 @@
 /**
  * 
  */
+class ATurnBasedCharacter;
 
 UCLASS()
 class DEMO_API UExecution_ResolveEffectValue : public UGameplayEffectExecutionCalculation
@@ -24,6 +25,7 @@ public:
 private:
 	void HandleResolveRules(const FExecutionContext* InContext, OUT float& Additive, OUT float& Multiplier)const;
 	void HandleModifyData(const FExecutionContext* InContext, const FExecutionModifyData& InData, OUT float& Additive, OUT float& Multiplier)const;
+	void EvaluateModifyData(ATurnBasedCharacter* Ref, const FExecutionModifyData& InData, OUT bool& bApply, OUT float& Count)const;
 	void HandleCamerMoveContext(const FExecutionContext* InContext)const;
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Data")

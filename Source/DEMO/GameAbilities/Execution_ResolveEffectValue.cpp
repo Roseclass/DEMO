@@ -61,25 +61,74 @@ void UExecution_ResolveEffectValue::HandleResolveRules(const FExecutionContext* 
 
 void UExecution_ResolveEffectValue::HandleModifyData(const FExecutionContext* InContext, const FExecutionModifyData& InData, OUT float& Additive, OUT float& Multiplier) const
 {
-	ATurnBasedCharacter* ref = nullptr;
+	TArray<ATurnBasedCharacter*> refArr;
 
 	// 레퍼런스 액터 설정
 	switch (InData.ReferenceActor)
 	{
-	case EExecutionReferenceActorType::EffectSource:ref = Cast<ATurnBasedCharacter>(InContext->EffectSourceActor.Get()); break;
-	case EExecutionReferenceActorType::EffectTarget:ref = Cast<ATurnBasedCharacter>(InContext->EffectTargetActor.Get()); break;
-	case EExecutionReferenceActorType::EffectCauser:ref = Cast<ATurnBasedCharacter>(InContext->EffectCauserActor.Get()); break;
-	case EExecutionReferenceActorType::SkillTarget:ref = Cast<ATurnBasedCharacter>(InContext->SkillTargetActor.Get()); break;
-	case EExecutionReferenceActorType::SkillCauser:ref = Cast<ATurnBasedCharacter>(InContext->SkillCauserActor.Get()); break;
+	case EExecutionReferenceActorType::EffectSource:refArr.Add(Cast<ATurnBasedCharacter>(InContext->EffectSourceActor.Get())); break;
+	case EExecutionReferenceActorType::EffectTarget:refArr.Add(Cast<ATurnBasedCharacter>(InContext->EffectTargetActor.Get())); break;
+	case EExecutionReferenceActorType::EffectCauser:refArr.Add(Cast<ATurnBasedCharacter>(InContext->EffectCauserActor.Get())); break;
+	case EExecutionReferenceActorType::SkillTargets:
+	{
+		for (auto ptr : InContext->SkillTargetActors)
+			refArr.Add(Cast<ATurnBasedCharacter>(ptr.Get()));
+		break; 	
+	}
+	case EExecutionReferenceActorType::SkillCauser:refArr.Add(Cast<ATurnBasedCharacter>(InContext->SkillCauserActor.Get())); break;
 	default:break;
 	}
-	CheckTrue_Print(!ref, "target cast FAILED!!");
 
-	UAbilityComponent* asc = Cast<UAbilityComponent>(ref->GetAbilitySystemComponent());
+	TArray<float> countArr;
+	for (auto ch : refArr)
+	{
+		bool bApply = 0;
+		float cnt = 0;
+		EvaluateModifyData(ch, InData, bApply, cnt);
+		if (!bApply)continue;
+		countArr.Add(cnt);
+	}
+	countArr.Sort();
+
+	while (countArr.Num() > InData.ReferenceActorCount && InData.ReferenceActor == EExecutionReferenceActorType::SkillTargets)
+	{
+		if (InData.SkillTargetSelectType == EExecutionSelectType::All)break;
+		else if (InData.SkillTargetSelectType == EExecutionSelectType::Top)
+			countArr.RemoveAt(0);
+		else if (InData.SkillTargetSelectType == EExecutionSelectType::Bottom)
+			countArr.RemoveAt(countArr.Num() - 1);
+		else if (InData.SkillTargetSelectType == EExecutionSelectType::Random)
+			countArr.RemoveAt(UKismetMathLibrary::RandomIntegerInRange(0, countArr.Num() - 1));
+	}
+
+	float cnt = 0;
+
+	if (InData.SkillTargetAggregationType == EExecutionAggregationType::Sum)
+		for (auto i : countArr)cnt += i;
+	else if (InData.SkillTargetAggregationType == EExecutionAggregationType::Average)
+	{
+		for (auto i : countArr)
+			cnt += i;
+		if (countArr.Num())cnt /= countArr.Num();
+		else cnt = 0;
+	}
+
+	switch (InData.ModifyOp)
+	{
+	case EExecutionModifyOp::AddConstant:Additive += InData.Value; break;
+	case EExecutionModifyOp::AddMeasuredValueScaled:Additive += (cnt * InData.Value); break;
+	case EExecutionModifyOp::MultiplyConstant:Multiplier *= InData.Value; break;
+	case EExecutionModifyOp::MultiplyFromMeasuredValue:Multiplier *= (cnt * InData.Value); break;
+	default:break;
+	}
+}
+
+void UExecution_ResolveEffectValue::EvaluateModifyData(ATurnBasedCharacter* Ref, const FExecutionModifyData& InData, OUT bool& bApply, OUT float& Count)const
+{
+	CheckTrue_Print(!Ref, "target cast FAILED!!");
+	UAbilityComponent* asc = Cast<UAbilityComponent>(Ref->GetAbilitySystemComponent());
 	CheckTrue_Print(!asc, "asc cast FAILED!!");
 
-	bool bApply = 0;
-	float cnt = 0;
 	// always라면 무조건 적용
 	if (InData.MeasureType == EExecutionMeasureType::Always)
 		bApply = 1;
@@ -93,46 +142,38 @@ void UExecution_ResolveEffectValue::HandleModifyData(const FExecutionContext* In
 		{
 			// 하위 태그 숫자 판정
 			for (auto tag : tags)
-				if (tag.MatchesTag(InData.Tag))cnt += 1;
-		} 
-		else if(InData.MeasureType == EExecutionMeasureType::HasTagExact)
+				if (tag.MatchesTag(InData.Tag))Count += 1;
+		}
+		else if (InData.MeasureType == EExecutionMeasureType::HasTagExact)
 		{
 			if (tags.HasAnyExact(FGameplayTagContainer(InData.Tag)))
+			{
 				bApply = 1;
+				Count = 1;
+			}
 		}
 	}
 	else if (InData.MeasureType == EExecutionMeasureType::Attribute)
 	{
 		// 어트리뷰트 값 불러오기
 		if (InData.AttributeType == EExecutionAttributeType::Health)
-			cnt = asc->GetHealth();
+			Count = asc->GetHealth();
 		else if (InData.AttributeType == EExecutionAttributeType::HealthRatio)
-			cnt = (asc->GetHealth() / asc->GetMaxHealth());
+			Count = (asc->GetHealth() / asc->GetMaxHealth());
 		else if (InData.AttributeType == EExecutionAttributeType::Power)
-			cnt = asc->GetPower();
+			Count = asc->GetPower();
 		else if (InData.AttributeType == EExecutionAttributeType::Speed)
-			cnt = asc->GetSpeed();
+			Count = asc->GetSpeed();
 	}
 
 	// 범위 판정
 	if (!bApply)
 	{
-		if(InData.CompareType == EExecutionCompareType::Less && cnt < InData.Threshold)bApply = 1;
-		else if(InData.CompareType == EExecutionCompareType::LessOrEqual && cnt <= InData.Threshold)bApply = 1;
-		else if(InData.CompareType == EExecutionCompareType::Equal && FMath::IsNearlyEqual(cnt, InData.Threshold))bApply = 1;
-		else if(InData.CompareType == EExecutionCompareType::GreaterOrEqual && InData.Threshold <= cnt)bApply = 1;
-		else if(InData.CompareType == EExecutionCompareType::Greater && InData.Threshold < cnt)bApply = 1;
-	}
-
-	CheckTrue(!bApply);
-
-	switch (InData.ModifyOp)
-	{
-	case EExecutionModifyOp::AddConstant:Additive += InData.Value; break;
-	case EExecutionModifyOp::AddMeasuredValueScaled:Additive += (cnt * InData.Value); break;
-	case EExecutionModifyOp::MultiplyConstant:Additive *= InData.Value; break;
-	case EExecutionModifyOp::MultiplyFromMeasuredValue:Multiplier *= (cnt * InData.Value); break;
-	default:break;
+		if (InData.CompareType == EExecutionCompareType::Less && Count < InData.Threshold)bApply = 1;
+		else if (InData.CompareType == EExecutionCompareType::LessOrEqual && Count <= InData.Threshold)bApply = 1;
+		else if (InData.CompareType == EExecutionCompareType::Equal && FMath::IsNearlyEqual(Count, InData.Threshold))bApply = 1;
+		else if (InData.CompareType == EExecutionCompareType::GreaterOrEqual && InData.Threshold <= Count)bApply = 1;
+		else if (InData.CompareType == EExecutionCompareType::Greater && InData.Threshold < Count)bApply = 1;
 	}
 }
 

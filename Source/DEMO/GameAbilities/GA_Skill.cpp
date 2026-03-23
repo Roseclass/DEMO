@@ -19,6 +19,24 @@ UGA_Skill::UGA_Skill()
 	CHelpers::GetClass<UGameplayEffect>(&CooldownGameplayEffectClass, "Blueprint'/Game/GAS/GE/GE_Cooldown.GE_Cooldown_C'");
 }
 
+void UGA_Skill::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	if (GoalCount < 1)GoalCount = 1;
+
+	switch (TargetType)
+	{
+	case ESkillTargetType::Enemy: break;
+	case ESkillTargetType::Ally: break;
+	case ESkillTargetType::AllyButSelf: break;
+	case ESkillTargetType::All: break;
+	case ESkillTargetType::AllButSelf: break;
+	case ESkillTargetType::Self:GoalCount = 1; break;
+	default:break;
+	}
+}
+
 void UGA_Skill::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);

@@ -76,7 +76,7 @@ private:
 protected:
 public:
 	void Init(FTransform InTransform);
-	void FocusSelectTarget();
+	void FocusAvailableTargets(TArray<ATurnBasedCharacter*> AvailableTargets);
 	void FocusSelectSkill(ATurnBasedCharacter* InCurrentTurnCharacter);
 	void SetTargetRotation(FRotator NewRotation);
 	bool IsRotating()const;

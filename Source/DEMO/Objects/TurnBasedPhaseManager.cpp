@@ -22,16 +22,15 @@
 #include "GameAbilities/GA_Skill.h"
 #include "GameAbilities/GE_InstantDamage.h"
 
-#include "Objects/SelectWidgetActor.h"
 #include "Objects/TurnbasedPhaseCamera.h"
 
-#include "Widgets/UW_TurnBased_Select.h"
+#include "Widgets/UW_TBRoot.h"
 
 ATurnBasedPhaseManager::ATurnBasedPhaseManager()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	CHelpers::GetClass<ASelectWidgetActor>(&SelectWidgetActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectSkill.BP_SelectSkill_C'");
-	CHelpers::GetClass<ASelectWidgetActor>(&SelectTargetCursorActorClass, "Blueprint'/Game/Widgets/SelectSkill/BP_SelectTarget.BP_SelectTarget_C'");
+
+	CHelpers::GetClass(&RootWidgetClass, "WidgetBlueprint'/Game/Widgets/TB/WBP_TBRoot.WBP_TBRoot_C'");
 
 	ReservedActions.FindOrAdd(EReservedActionTiming::AfterCurrentAction);
 	ReservedActions.FindOrAdd(EReservedActionTiming::StartOfNextTurn);
@@ -42,7 +41,7 @@ void ATurnBasedPhaseManager::BeginPlay()
 {
 	Super::BeginPlay();
 	SpawnCamera();
-	SpawnSelectWidget();
+	CreateRootWidget();
 }
 
 void ATurnBasedPhaseManager::Tick(float DeltaTime)
@@ -64,36 +63,48 @@ void ATurnBasedPhaseManager::SpawnCamera()
 	UGameplayStatics::FinishSpawningActor(Camera, FTransform());	
 
 	APlayerController* pc = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-	pc->SetInputMode(FInputModeUIOnly());
+	pc->SetInputMode(FInputModeGameAndUI());
 	pc->SetViewTargetWithBlend(Camera);
 }
 
-void ATurnBasedPhaseManager::SpawnSelectWidget()
+void ATurnBasedPhaseManager::CreateRootWidget()
 {
-	SelectWidgetActor = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectWidgetActorClass, FTransform(), this);
-	UUW_TurnBased_Select* select = Cast<UUW_TurnBased_Select>(SelectWidgetActor->GetWidgetObject());
-	TFunction<void(FGameplayTag, ATurnBasedCharacter*)>func = [this](FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget)
-	{
-		this->ConfirmSelect(InSkillTag, InTarget);
-	};
-	select->OnConfirm.AddLambda(func);
+	CheckTrue_Print(!RootWidgetClass, "RootWidgetClass is nullptr!!");
+	RootWidget = CreateWidget<UUW_TBRoot>(UGameplayStatics::GetPlayerController(GetWorld(), 0), RootWidgetClass);
+	RootWidget->AddToViewport();
+	CheckTrue_Print(!RootWidgetClass, "RootWidget is nullptr!!");
 
-	SelectTargetCursorActor = ASelectWidgetActor::CreateSelectWidgetActor(GetWorld(), SelectTargetCursorActorClass, FTransform(), this);
-	
-	TFunction<void(ATurnBasedCharacter*)>func1 = [this](ATurnBasedCharacter* InCharacter)
-	{
-		FRotator lookat = UKismetMathLibrary::FindLookAtRotation(Camera->GetActorLocation(), InCharacter->GetActorLocation());
-		Camera->SetTargetRotation(lookat);
-	};
+	UUW_TBSelect* select = RootWidget->GetSelectWidget();
 
-	select->SetTargetCursorActor(SelectTargetCursorActor);
-	select->OnHorizontalMove.AddLambda(func1);
-
-	TFunction<bool()>func2 = [this]()
+	TFunction<void(FGameplayTag)> enter = [this](FGameplayTag InSkillTag)
 	{
-		return !Camera->IsRotating();
+		CurrentSelectedSkillTag = InSkillTag;
+		if(CurrentStage == EActionStage::SelectSkill)
+			CurrentTurnCharacter->OnAnimTagChanged.Broadcast(InSkillTag);
 	};
-	select->CanAcceptKey.BindLambda(func2);
+	select->OnSkillIconMouseEnter.BindLambda(enter);
+
+	TFunction<void(FGameplayTag)> leave = [this](FGameplayTag InSkillTag)
+	{
+		CurrentSelectedSkillTag = InSkillTag;
+		if (CurrentStage == EActionStage::SelectSkill)
+			CurrentTurnCharacter->OnAnimTagChanged.Broadcast(InSkillTag);
+	};
+	select->OnSkillIconMouseLeave.BindLambda(leave);
+
+	TFunction<void()> clicked = [this]()
+	{
+		// 스킬 아이콘 클릭:카메라뷰 변경 + 타겟 선택 활성화
+		CheckTrue(Camera->IsRotating());
+
+		// 다른 스킬 클릭시 selectTarget 재진입
+		// 선택된 스킬 아이콘은 glow된 상태로 만들기
+
+		TargetCharacters.Empty();
+		NextStage = EActionStage::SelectTarget;
+		HandleStageTransition();
+	};
+	select->OnSkillIconClicked.BindLambda(clicked);
 }
 
 void ATurnBasedPhaseManager::TrySpawnCharacter()
@@ -119,6 +130,9 @@ void ATurnBasedPhaseManager::SpawnCharacter(uint8 TeamID, UTurnBasedCharacterDat
 	else if(TeamID == TEAMID_ENEMY)ch = GetWorld()->SpawnActorDeferred<ATurnBasedEnemy>(ATurnBasedEnemy::StaticClass(), FTransform(), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	CheckTrue_Print(!ch, "ch is nullptr");
 	UGameplayStatics::FinishSpawningActor(ch, FTransform());
+	ch->OnBeginCursorOver.AddDynamic(this,&ATurnBasedPhaseManager::OnSpawnedCharacterBeginCursorOver);
+	ch->OnEndCursorOver.AddDynamic(this, &ATurnBasedPhaseManager::OnSpawnedCharacterEndCursorOver);
+	ch->OnClicked.AddDynamic(this, &ATurnBasedPhaseManager::OnSpawnedCharacterClicked);
 	ch->Init(FGuid(), InData);
 	ch->SetGenericTeamId(TeamID);
 	SpawnedCharacterMap.FindOrAdd(TeamID).Add(ch);
@@ -131,6 +145,42 @@ void ATurnBasedPhaseManager::SpawnCharacter(uint8 TeamID, UTurnBasedCharacterDat
 			CheckTrue_Print(!ch, "RegisterPendingDeadArray Cast failed!!");
 			PendingDeadArray.Add(ch);
 		});
+}
+
+void ATurnBasedPhaseManager::OnSpawnedCharacterBeginCursorOver(AActor* TouchedActor)
+{
+	CheckTrue(CurrentStage != EActionStage::SelectTarget);
+	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(TouchedActor);
+	CheckTrue_Print(!ch, "ch cast failed!!");
+
+	if(CurrentTurnCharacter->GetGenericTeamId() == ch->GetGenericTeamId())
+		ch->ApplyHighlight(EHighlightType::Green);
+	else
+		ch->ApplyHighlight(EHighlightType::Red);
+}
+
+void ATurnBasedPhaseManager::OnSpawnedCharacterEndCursorOver(AActor* TouchedActor)
+{
+	CheckTrue(CurrentStage != EActionStage::SelectTarget);
+	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(TouchedActor);
+	CheckTrue_Print(!ch, "ch cast failed!!");
+	ch->ApplyHighlight(EHighlightType::Gray);
+}
+
+void ATurnBasedPhaseManager::OnSpawnedCharacterClicked(AActor* TouchedActor, FKey ButtonPressed)
+{
+	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(TouchedActor);
+	CheckTrue_Print(!ch, "ch cast failed!!");
+	CheckTrue(ButtonPressed != EKeys::LeftMouseButton);
+
+	TargetCharacters.AddUnique(ch);
+	
+	if (FMath::IsNearlyEqual(TargetCharacters.Num(), TargetGoalCount))
+	{
+		ClearAvailableTargets();
+		NextStage = EActionStage::PrePlaySequence;
+		HandleStageTransition();
+	}
 }
 
 void ATurnBasedPhaseManager::PlaceActorsOnField()
@@ -174,6 +224,19 @@ void ATurnBasedPhaseManager::PlaceActorsOnField()
 	FindNextTurn();
 }
 
+void ATurnBasedPhaseManager::HighlightAvailableTargets()
+{
+	for(auto ch : AvailableTargets)
+		ch->ApplyHighlight(EHighlightType::Gray);
+}
+
+void ATurnBasedPhaseManager::ClearAvailableTargets()
+{
+	for (auto ch : AvailableTargets)
+		ch->ApplyHighlight(EHighlightType::NONE);
+	AvailableTargets.Empty();
+}
+
 EReservedActionType ATurnBasedPhaseManager::ConsumeAfterCurrentAction()
 {
 	if (ReservedActions[EReservedActionTiming::AfterCurrentAction].IsEmpty())
@@ -213,7 +276,9 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeAfterCurrentAction()
 		else if(payload->Target == EPayloadActorType::EventTarget)
 			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
 
-		PlaySequence(payload->SkillTag, instigator, target, 1);
+		TArray<ATurnBasedCharacter*> targets;
+		targets.Add(target);
+		PlaySequence(payload->SkillTag, instigator, targets, 1);
 	}
 
 	return payload->Type;
@@ -268,7 +333,9 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeStartOfNextTurn()
 		else if (payload->Target == EPayloadActorType::EventTarget)
 			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
 
-		PlaySequence(payload->SkillTag, instigator, target, 1);
+		TArray<ATurnBasedCharacter*> targets;
+		targets.Add(target);
+		PlaySequence(payload->SkillTag, instigator, targets, 1);
 	}
 
 	return payload->Type;
@@ -313,7 +380,9 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeEndOfTurn()
 		else if (payload->Target == EPayloadActorType::EventTarget)
 			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
 
-		PlaySequence(payload->SkillTag, instigator, target, 1);
+		TArray<ATurnBasedCharacter*> targets;
+		targets.Add(target);
+		PlaySequence(payload->SkillTag, instigator, targets, 1);
 	}
 
 	return payload->Type;
@@ -323,40 +392,50 @@ void ATurnBasedPhaseManager::HandleStageTransition()
 {
 	if (NextStage == EActionStage::PrePlaySequence)
 	{
-		FEffectEventContext* eec = new FEffectEventContext();
-		eec->EventCauserActor = CurrentTurnCharacter;
-		eec->EventTargetActor = TargetCharacter;
+		CurrentStage = EActionStage::PrePlaySequence;
+		for (auto target : TargetCharacters)
+		{
+			FEffectEventContext* eec = new FEffectEventContext();
+			eec->EventCauserActor = CurrentTurnCharacter;
+			eec->EventTargetActor = target;
 
-		UTurnBasedSubsystem* TBS = GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
-		TBS->SolvePreEvent(eec);
+			UTurnBasedSubsystem* TBS = GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
+			TBS->SolvePreEvent(eec);
+		}
 		NextStage = EActionStage::PlaySequence;
 	}
 
 	if (ConsumeAfterCurrentAction() == EReservedActionType::ExtraSkill)return;
 
-	if (NextStage == EActionStage::FindNextTurn)
-		FindNextTurn();
-	else if (NextStage == EActionStage::HandleEffects)
-		HandleEffects();
-	else if (NextStage == EActionStage::FindDoTDamage)
-		FindDoTDamage();
-	else if (NextStage == EActionStage::HandleDoTDamage)
-		HandleDoTDamage();
-	else if (NextStage == EActionStage::HandleCC)
-		HandleCC();
-	else if (NextStage == EActionStage::FocusSelect)
-		FocusSelect();
-	else if (NextStage == EActionStage::PlaySequence)
-		PlaySequence(CurrentSelectedSkillTag, CurrentTurnCharacter, TargetCharacter);
-	else if (NextStage == EActionStage::EndTurn)
+#define Handle(x) \
+CurrentStage = EActionStage::x; \
+x(); \
+break;
+
+	switch (NextStage)
 	{
-		if (ConsumeEndOfTurn() == EReservedActionType::ExtraSkill)return;
-		EndTurn();
+	case EActionStage::FindNextTurn: {Handle(FindNextTurn); }
+	case EActionStage::HandleEffects: {Handle(HandleEffects); }
+	case EActionStage::FindDoTDamage: {Handle(FindDoTDamage); }
+	case EActionStage::HandleDoTDamage: {Handle(HandleDoTDamage); }
+	case EActionStage::HandleCC: {Handle(HandleCC); }
+	case EActionStage::SelectSkill: {Handle(SelectSkill); }
+	case EActionStage::SelectTarget: {Handle(SelectTarget); }
+	case EActionStage::PrePlaySequence:break;
+	case EActionStage::PlaySequence:
+	{
+		CurrentStage = EActionStage::PlaySequence;
+		PlaySequence(CurrentSelectedSkillTag, CurrentTurnCharacter, TargetCharacters);
+		break;
 	}
-	else if (NextStage == EActionStage::FindDeadCharacter)
-		FindDeadCharacter();
-	else if (NextStage == EActionStage::HandleDeadCharacter)
-		HandleDeadCharacter();
+	case EActionStage::EndTurn: {Handle(EndTurn); }
+	case EActionStage::FindDeadCharacter: {Handle(FindDeadCharacter); }
+	case EActionStage::HandleDeadCharacter: {Handle(HandleDeadCharacter); }
+	case EActionStage::MAX:break;
+	default:break;
+	}
+
+#undef Handle
 }
 
 void ATurnBasedPhaseManager::FindNextTurn()
@@ -511,30 +590,90 @@ void ATurnBasedPhaseManager::HandleCC()
 	else
 	{
 		asc->HandleCC();
-		NextStage = EActionStage::FocusSelect;
+		NextStage = EActionStage::SelectSkill;
 		HandleStageTransition();
 	}
 }
 
-void ATurnBasedPhaseManager::FocusSelect()
+void ATurnBasedPhaseManager::SelectSkill()
 {
+	UUW_TBSelect* select = RootWidget->GetSelectWidget();
+	select->Activate(CurrentTurnCharacter);
+
 	Camera->FocusSelectSkill(CurrentTurnCharacter);
-	SelectWidgetActor->SetActorTransform(CurrentTurnCharacter->GetActorTransform());
-	//SelectWidgetActor->SetWidgetRelativeTransform(CurrentTurnCharacter->GetSelectSkillRelativeTransform());
 
-	UUW_TurnBased_Select* select = Cast<UUW_TurnBased_Select>(SelectWidgetActor->GetWidgetObject());
-	select->Activate(CurrentTurnCharacter, LocationArray[TEAMID_PLAYER], LocationArray[TEAMID_ENEMY]);
-	SelectWidgetActor->Show();
-	SelectTargetCursorActor->Show();
-
-	if (CurrentTurnCharacter->IsA<ATurnBasedEnemy>())
-	{
-		UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(CurrentTurnCharacter->GetController());
-		behavior->SetWaitMode();
-	}
+	// ai 후처리
+	//if (CurrentTurnCharacter->IsA<ATurnBasedEnemy>())
+	//{
+	//	UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(CurrentTurnCharacter->GetController());
+	//	behavior->SetWaitMode();
+	//}
 }
 
-void ATurnBasedPhaseManager::PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, ATurnBasedCharacter* Target, bool Extra)
+void ATurnBasedPhaseManager::SelectTarget()
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
+	CheckTrue_Print(!asc, "asc is nullptr!!");
+
+	FGameplayAbilitySpec* spec = asc->FindAbilitySpecFromSkillTag(CurrentSelectedSkillTag);
+	CheckTrue_Print(!spec, "spec is nullptr!!");
+
+	UGA_Skill* skill = Cast<UGA_Skill>(spec->Ability);
+	CheckTrue_Print(!skill, "skill cast failed!!");
+
+	//최초 1회 캠위치변경, 테두리 glow를 위한 스텐실변경
+	if (TargetCharacters.IsEmpty())
+	{
+		ClearAvailableTargets();
+		TargetGoalCount = skill->GetGoalCount();
+		SkillTargetType = skill->GetTargetType();
+
+		uint8 ally = CurrentTurnCharacter->GetGenericTeamId();
+		uint8 enemy = CurrentTurnCharacter->GetGenericTeamId() ^ 1;
+
+		//카메라 샷 추가, ai 적용 테스트, 시퀀스 재생 테스트, 다중 타겟 적용
+
+		if(SkillTargetType == ESkillTargetType::Enemy)
+		{
+			for (auto ch : SpawnedCharacterMap[enemy])
+			{
+				if (ch->IsDead())continue;
+				AvailableTargets.Add(ch);
+			}
+		}
+		else if(SkillTargetType == ESkillTargetType::Ally || SkillTargetType == ESkillTargetType::AllyButSelf)
+		{
+			for (auto ch : SpawnedCharacterMap[ally])
+			{
+				if (ch->IsDead())continue;
+				AvailableTargets.Add(ch);
+			}
+			if (SkillTargetType == ESkillTargetType::AllyButSelf)
+				AvailableTargets.Remove(CurrentTurnCharacter);
+		}
+		else if(SkillTargetType == ESkillTargetType::All || SkillTargetType == ESkillTargetType::AllButSelf)
+		{
+			for (auto tuple : SpawnedCharacterMap)
+				for (auto ch : tuple.Value)
+				{
+					if (ch->IsDead())continue;
+					AvailableTargets.Add(ch);
+				}
+			if (SkillTargetType == ESkillTargetType::AllButSelf)
+				AvailableTargets.Remove(CurrentTurnCharacter);
+		}
+		else if(SkillTargetType == ESkillTargetType::Self)
+		{
+			AvailableTargets.Add(CurrentTurnCharacter);
+		}
+
+		HighlightAvailableTargets();
+		Camera->FocusAvailableTargets(AvailableTargets);
+	}
+
+}
+
+void ATurnBasedPhaseManager::PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, TArray<ATurnBasedCharacter*> Targets, bool Extra)
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(SkillOwner->GetAbilitySystemComponent());
 	TArray<FGameplayAbilitySpec>& abilities = asc->GetActivatableAbilities();
@@ -543,17 +682,19 @@ void ATurnBasedPhaseManager::PlaySequence(FGameplayTag SkillTag, ATurnBasedChara
 		const UGA_Skill* skill = Cast<UGA_Skill>(spec.Ability);
 		if (!skill)continue;
 		if (skill->GetSkillTag() != SkillTag)continue;
-		asc->SetTarget(Target);
+		asc->SetTargets(Targets);
 		asc->TryActivateAbility(spec.Handle);
 		break;
 	}
 	if (!Extra)
 	{
 		// 추가 이벤트 판정
+		for(auto target : Targets)
 		{
 			FEffectEventContext* eec = new FEffectEventContext();
 			eec->EventCauserActor = SkillOwner;
-			eec->EventTargetActor = Target;
+			eec->EventTargetActor = target;
+			//eec->EventTargetActors.Add(Target);
 
 			UTurnBasedSubsystem* TBS = GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
 			TBS->SolveHitEvent(eec);
@@ -572,17 +713,6 @@ void ATurnBasedPhaseManager::EndTurn()
 	}
 
 	NextStage = EActionStage::FindDeadCharacter;
-	HandleStageTransition();
-}
-
-void ATurnBasedPhaseManager::ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget)
-{
-	SelectWidgetActor->Hide();
-	SelectTargetCursorActor->Hide();
-	CurrentSelectedSkillTag = InSkillTag;
-	TargetCharacter = InTarget;
-
-	NextStage = EActionStage::PrePlaySequence;
 	HandleStageTransition();
 }
 
@@ -642,25 +772,25 @@ bool ATurnBasedPhaseManager::IsPlayerVictory()
 
 void ATurnBasedPhaseManager::HandlePlayerVictory()
 {
-	/*
-	* 승리 후 tps필드로
-	*/
+	///*
+	//* 승리 후 tps필드로
+	//*/
 
-	//필드 정리하기
-	for (auto& tuple : SpawnedCharacterMap)
-	{
-		for (auto ch : tuple.Value)
-			ch->Destroy();
-	}
-	Camera->Destroy();
-	SelectWidgetActor->Destroy();
-	SelectTargetCursorActor->Destroy();
+	////필드 정리하기
+	//for (auto& tuple : SpawnedCharacterMap)
+	//{
+	//	for (auto ch : tuple.Value)
+	//		ch->Destroy();
+	//}
+	//Camera->Destroy();
+	//SelectWidgetActor->Destroy();
+	//SelectTargetCursorActor->Destroy();
 
-	// ui 팝업에 tps필드 이동을 달아놓자
-	UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
+	//// ui 팝업에 tps필드 이동을 달아놓자
+	//UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
 
-	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
-	gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
+	//UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	//gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
 
 }
 
@@ -675,25 +805,25 @@ bool ATurnBasedPhaseManager::IsPlayerDefeat()
 
 void ATurnBasedPhaseManager::HandlePlayerDefeat()
 {
-	/*
-	* 패배 후 어디로? 메인? 최근 저장된곳?
-	*/
+	///*
+	//* 패배 후 어디로? 메인? 최근 저장된곳?
+	//*/
 
-	//필드 정리하기
-	for (auto& tuple : SpawnedCharacterMap)
-	{
-		for (auto ch : tuple.Value)
-			ch->Destroy();
-	}
-	Camera->Destroy();
-	SelectWidgetActor->Destroy();
-	SelectTargetCursorActor->Destroy();
+	////필드 정리하기
+	//for (auto& tuple : SpawnedCharacterMap)
+	//{
+	//	for (auto ch : tuple.Value)
+	//		ch->Destroy();
+	//}
+	//Camera->Destroy();
+	//SelectWidgetActor->Destroy();
+	//SelectTargetCursorActor->Destroy();
 
-	// ui 팝업에 tps필드 이동을 달아놓자
-	UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
+	//// ui 팝업에 tps필드 이동을 달아놓자
+	//UPhaseTransitionContext* context = NewObject<UPhaseTransitionContext>(this, UPhaseTransitionContext::StaticClass());
 
-	UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
-	gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
+	//UDEMOGameInstance* gi = Cast<UDEMOGameInstance>(GetGameInstance());
+	//gi->RequestPhaseChange(EGameInstancePhase::TPS, context);
 }
 
 void ATurnBasedPhaseManager::SetLevelData(FTurnBasedFieldLayoutRow* NewLevelData)
@@ -830,7 +960,8 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 		context->EffectCauserActor = InEffectContext->EventCauserActor.Get();
 		context->EffectTargetActor = target;
 		context->SkillCauserActor = CurrentTurnCharacter;
-		context->SkillTargetActor = TargetCharacter;
+		for (auto ch : TargetCharacters)
+			context->SkillTargetActors.Add(ch);
 
 		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 		EffectContextHandle.AddInstigator(InEffectContext->EventCauserActor.Get(), InEffectContext->EventCauserActor.Get());

@@ -13,6 +13,12 @@ class UTurnBasedCameraComponent;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAnimTagChanged, FGameplayTag);
 
+UENUM(BlueprintType)
+enum class EHighlightType : uint8
+{
+	NONE, Gray, Green, Red, MAX UMETA(Hidden)
+};
+
 UCLASS()
 class DEMO_API ATurnBasedCharacter : public ABaseCharacter
 {
@@ -45,6 +51,8 @@ protected:
 public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const override;
+
+	void ApplyHighlight(EHighlightType HighlightType);
 
 	//from runtime
 	FTransform GetSelectTargetTransform() const;

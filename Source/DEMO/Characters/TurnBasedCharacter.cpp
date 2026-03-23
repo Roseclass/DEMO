@@ -1,6 +1,8 @@
 #include "Characters/TurnBasedCharacter.h"
 #include "Global.h"
 
+#include "Components/CapsuleComponent.h"
+
 #include "SaveLoadSubsystem.h"
 
 #include "GameAbilities/AbilityComponent.h"
@@ -11,6 +13,8 @@
 ATurnBasedCharacter::ATurnBasedCharacter()
 {
 	CHelpers::CreateActorComponent<UTurnBasedCameraComponent>(this, &TurnBasedCamera, "TurnbasedCamera");
+
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
 }
 
 void ATurnBasedCharacter::BeginPlay()
@@ -21,22 +25,21 @@ void ATurnBasedCharacter::BeginPlay()
 void ATurnBasedCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	UAbilityComponent* asc = Cast<UAbilityComponent>(GetAbilitySystemComponent());
 	if (GetGenericTeamId() == TEAMID_PLAYER)
 	{
 		FGameplayTagContainer tags;
-		asc->GetOwnedGameplayTags(tags);
+		Ability->GetOwnedGameplayTags(tags);
 		for (auto i : tags)
 			CLog::Print(GetName() + i.ToString(), -1, 0, FColor::Silver);
-		CLog::Print(asc->GetHealth(), -1, 0, FColor::Purple);
+		CLog::Print(Ability->GetHealth(), -1, 0, FColor::Purple);
 	}
 	if (GetGenericTeamId() == TEAMID_ENEMY)
 	{
 		FGameplayTagContainer tags;
-		asc->GetOwnedGameplayTags(tags);
+		Ability->GetOwnedGameplayTags(tags);
 		for (auto i : tags)
 			CLog::Print(GetName() + i.ToString(), -1, 0, FColor::Black);
-		CLog::Print(asc->GetHealth(), -1, 0, FColor::Green);
+		CLog::Print(Ability->GetHealth(), -1, 0, FColor::Green);
 	}
 }
 
@@ -94,6 +97,22 @@ void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 FGameplayTag ATurnBasedCharacter::GetDataTag() const
 {
 	return RuntimeData.DataTag;
+}
+
+void ATurnBasedCharacter::ApplyHighlight(EHighlightType HighlightType)
+{
+	if (HighlightType == EHighlightType::NONE)
+	{
+		GetMesh()->SetRenderCustomDepth(0);
+		return;
+	}
+	GetMesh()->SetRenderCustomDepth(1);
+	if (HighlightType == EHighlightType::Gray)
+		GetMesh()->SetCustomDepthStencilValue(1);
+	else if (HighlightType == EHighlightType::Green)
+		GetMesh()->SetCustomDepthStencilValue(2);
+	else if (HighlightType == EHighlightType::Red)
+		GetMesh()->SetCustomDepthStencilValue(3);
 }
 
 FTransform ATurnBasedCharacter::GetSelectTargetTransform() const

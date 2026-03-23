@@ -49,6 +49,12 @@ UCLASS(BlueprintType)
 class DEMO_API UDEMOSkillUIDataRegistry : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+		TMap<FGameplayTag, FDEMOSkillUIDatas> SkillUIDataMap;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (AllowPrivateAccess = "true", DisplayThumbnail = "true", DisplayName = "Image", AllowedClasses = "Texture,MaterialInterface,SlateTextureAtlasInterface", DisallowedClasses = "MediaTexture"))
+		TObjectPtr<UObject> EmptyRoundIconResourceObject;
 private:
 	void CreateSkillUIDataMap()
 	{
@@ -67,10 +73,41 @@ protected:
 		Super::PostEditChangeProperty(PropertyChangedEvent);
 		CreateSkillUIDataMap();
 	};
+};
+
+USTRUCT(BlueprintType)
+struct FDEMOCharacterUIDatas
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (AllowPrivateAccess = "true", DisplayThumbnail = "true", DisplayName = "Image", AllowedClasses = "Texture,MaterialInterface,SlateTextureAtlasInterface", DisallowedClasses = "MediaTexture"))
+		TObjectPtr<UObject> PortraitIconResourceObject;
+};
+
+UCLASS(BlueprintType)
+class DEMO_API UDEMOCharacterUIDataRegistry : public UPrimaryDataAsset
+{
+	GENERATED_BODY()
 public:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-		TMap<FGameplayTag, FDEMOSkillUIDatas> SkillUIDataMap;
-
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (AllowPrivateAccess = "true", DisplayThumbnail = "true", DisplayName = "Image", AllowedClasses = "Texture,MaterialInterface,SlateTextureAtlasInterface", DisallowedClasses = "MediaTexture"))
-		TObjectPtr<UObject> EmptyRoundIconResourceObject;
+		TMap<FGameplayTag, FDEMOCharacterUIDatas> CharacterUIDataMap;
+private:
+	void CreateCharacterUIDataMap()
+	{
+		CharacterUIDataMap.FindOrAdd(FGameplayTag::RequestGameplayTag("Data.Gideon"));
+		CharacterUIDataMap.FindOrAdd(FGameplayTag::RequestGameplayTag("Data.Revenant"));
+		CharacterUIDataMap.FindOrAdd(FGameplayTag::RequestGameplayTag("Data.Terra"));
+		CharacterUIDataMap.FindOrAdd(FGameplayTag::RequestGameplayTag("Data.Morigesh"));
+	}
+public:
+	UDEMOCharacterUIDataRegistry()
+	{
+		CreateCharacterUIDataMap();
+	};
+protected:
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override
+	{
+		Super::PostEditChangeProperty(PropertyChangedEvent);
+		CreateCharacterUIDataMap();
+	};
 };

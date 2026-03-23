@@ -152,9 +152,14 @@ void ATurnbasedPhaseCamera::Init(FTransform InTransform)
 	InitialTransform = InTransform;
 }
 
-void ATurnbasedPhaseCamera::FocusSelectTarget()
+void ATurnbasedPhaseCamera::FocusAvailableTargets(TArray<ATurnBasedCharacter*> AvailableTargets)
 {
-	SetActorTransform(InitialTransform);
+	SetActorLocation(InitialTransform.GetTranslation());
+
+	FVector lookat = FVector();
+	for (auto i : AvailableTargets)lookat += i->GetActorLocation();
+	lookat /= AvailableTargets.Num();
+	SetActorRotation(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), lookat));
 }
 
 void ATurnbasedPhaseCamera::FocusSelectSkill(ATurnBasedCharacter* InCurrentTurnCharacter)

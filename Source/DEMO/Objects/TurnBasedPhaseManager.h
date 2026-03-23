@@ -17,7 +17,8 @@ struct FTurnBasedFieldLayoutRow;
 class ATurnbasedPhaseCamera;
 class ATurnBasedCharacter;
 class UTurnBasedCharacterData;
-class ASelectWidgetActor;
+class UUW_TBRoot;
+enum class ESkillTargetType : uint8;
 
 UENUM()
 enum class EActionStage : uint8
@@ -27,7 +28,8 @@ enum class EActionStage : uint8
 	FindDoTDamage,
 	HandleDoTDamage,
 	HandleCC,
-	FocusSelect,
+	SelectSkill,
+	SelectTarget,
 	PrePlaySequence,
 	PlaySequence,
 	EndTurn,
@@ -59,13 +61,17 @@ private:
 	TMap<EReservedActionTiming, TArray<FPayloadContext>>ReservedActions;
 
 	ATurnbasedPhaseCamera* Camera;
-	ASelectWidgetActor* SelectWidgetActor;
-	TSubclassOf<ASelectWidgetActor>SelectWidgetActorClass;
-	ASelectWidgetActor* SelectTargetCursorActor;
-	TSubclassOf<ASelectWidgetActor>SelectTargetCursorActorClass;
+
+	UPROPERTY()UUW_TBRoot* RootWidget;
+	TSubclassOf<UUW_TBRoot> RootWidgetClass;
+
 	FGameplayTag CurrentSelectedSkillTag;
 	ATurnBasedCharacter* CurrentTurnCharacter;
-	ATurnBasedCharacter* TargetCharacter;
+	TArray<ATurnBasedCharacter*> TargetCharacters;
+	TArray<ATurnBasedCharacter*> AvailableTargets;
+
+	float TargetGoalCount;
+	ESkillTargetType SkillTargetType;
 
 	TMap<FGameplayTag, int32> SpawnRequestCountMap;
 	TMap<uint8, TArray<UTurnBasedCharacterData*>> PendingSpawnMap; 
@@ -79,10 +85,16 @@ public:
 	//function
 private:
 	void SpawnCamera();
-	void SpawnSelectWidget();
+	void CreateRootWidget();
 	void TrySpawnCharacter();
 	void SpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
+	UFUNCTION() void OnSpawnedCharacterBeginCursorOver(AActor* TouchedActor);
+	UFUNCTION() void OnSpawnedCharacterEndCursorOver(AActor* TouchedActor);
+	UFUNCTION() void OnSpawnedCharacterClicked(AActor* TouchedActor, FKey ButtonPressed);
 	void PlaceActorsOnField();
+
+	void HighlightAvailableTargets();
+	void ClearAvailableTargets();
 
 	EReservedActionType ConsumeAfterCurrentAction();
 	EReservedActionType ConsumeStartOfNextTurn();
@@ -94,11 +106,10 @@ private:
 	void FindDoTDamage();
 	void HandleDoTDamage();
 	void HandleCC();
-	void FocusSelect();
-	void PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, ATurnBasedCharacter* Target, bool Extra = 0);
+	void SelectSkill();
+	void SelectTarget();
+	void PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, TArray<ATurnBasedCharacter*> TargetCharacters, bool Extra = 0);
 	UFUNCTION()void EndTurn();
-
-	UFUNCTION()void ConfirmSelect(FGameplayTag InSkillTag, ATurnBasedCharacter* InTarget);
 
 	void FindDeadCharacter();
 	UFUNCTION()void HandleDeadCharacter();
