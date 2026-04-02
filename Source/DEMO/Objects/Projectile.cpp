@@ -1,6 +1,7 @@
 #include "Objects/Projectile.h"
 #include "Global.h"
 #include "Components/ShapeComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "AbilitySystemInterface.h"
@@ -27,6 +28,8 @@ void AProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 	FindCollision();
+	InitProjectile();
+
 }
 
 void AProjectile::Tick(float DeltaTime)
@@ -49,12 +52,12 @@ void AProjectile::OnComponentBeginOverlap(UPrimitiveComponent* OverlappedCompone
 	// overlap with DungeonCharacterBase
 	ATurnBasedCharacter* other = Cast<ATurnBasedCharacter>(OtherActor);
 	CheckTrue(!other);
-	CheckTrue(other != GetDataContext().TargetActor);
+	CheckTrue(other != GetData().TargetActor);
 
 	HitResult = SweepResult;
 
 	bCollsion = 1;
-	SendEvent(GetDataContext().CollisionTriggerDatas, bCollsionEvent);
+	SendEvent(GetData().CollisionTriggerDatas, bCollsionEvent);
 	SendDamage(OtherActor, SweepResult);
 }
 
@@ -87,6 +90,19 @@ void AProjectile::FindCollision()
 	}
 }
 
+void AProjectile::InitProjectile()
+{
+	ProjectileMovementComponent->Velocity = GetActorForwardVector() * ProjectileMovementComponent->InitialSpeed;
+
+	FTimerHandle WaitHandle;
+	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([this]()
+		{
+			ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(GetTarget());
+			ProjectileMovementComponent->HomingTargetComponent = ch->GetCapsuleComponent();
+			ProjectileMovementComponent->bIsHomingProjectile = 1;
+		}), UKismetMathLibrary::RandomFloatInRange(HomingDelayMin, HomingDelayMax), false);
+}
+
 bool AProjectile::TryDestroy()
 {
 	bool result = Super::TryDestroy();
@@ -101,7 +117,7 @@ bool AProjectile::TryDestroy()
 	return result;
 }
 
-void AProjectile::Init(const FSpawnDamageDealerContext* InData)
+void AProjectile::Init(const FSpawnDamageDealerData* InData)
 {
 	Super::Init(InData);
 
@@ -110,5 +126,5 @@ void AProjectile::Init(const FSpawnDamageDealerContext* InData)
 
 AActor* AProjectile::GetTarget()
 {
-	return GetDataContext().TargetActor.Get();
+	return GetData().TargetActor.Get();
 }

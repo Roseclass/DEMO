@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
-#include "GameAbilities/GameplayEffectContexts.h"
+#include "GameAbilities/GameplayEffectPayloads.h"
 #include "DamageDealer.generated.h"
 
 class AController;
@@ -75,7 +75,7 @@ private:
 	bool bPlayNextMontage;
 	bool bSpawnNextDamageDealer;
 	int32 CurrentHitCount;
-	FSpawnDamageDealerContext Data;
+	FSpawnDamageDealerData Data;
 protected:
 	float CurrentDamageTick;
 	FHitResult HitResult;
@@ -139,9 +139,9 @@ protected:
 
 	void SendEvent(const TArray<FDamageDealerTriggerData>& InDatas,bool& InFlag);
 
-	FORCEINLINE const FSpawnDamageDealerContext& GetDataContext()const { return Data; }
+	FORCEINLINE const FSpawnDamageDealerData& GetData()const { return Data; }
 public:
-	virtual void Init(const FSpawnDamageDealerContext* InData);
+	virtual void Init(const FSpawnDamageDealerData* InData);
 
 	FORCEINLINE bool IsActivated()const { return bAct; }
 };

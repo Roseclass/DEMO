@@ -45,6 +45,8 @@ private:
 	TSet<FActiveGameplayEffectHandle> DebuffHandles;
 	TSet<FActiveGameplayEffectHandle> CCHandles;
 	TSet<FActiveGameplayEffectHandle> DoTDamageHandles;
+
+	TMap<FGameplayTag, FActiveGameplayEffectHandle> DurationFXHandles;
 protected:
 public:
 	FAbilityComponentSignature OnSkillEnd;
@@ -53,6 +55,7 @@ public:
 
 	//function
 private:
+	UFUNCTION()void OnAnyGameplayEffectRemoved(const FActiveGameplayEffect& RemovedGE);
 protected:
 public:
 	void InitGA(const TArray<FAbilitySpecInfo>& NewGAs);

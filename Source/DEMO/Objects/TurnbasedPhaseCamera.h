@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Engine/DataTable.h"
-#include "GameAbilities/GameplayEffectPayloads.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "TurnbasedPhaseCamera.generated.h"
 
 class USpringArmComponent;
@@ -53,7 +53,7 @@ private:
 	float ElapsedTime;
 
 	AActor* ShotOrigin;
-	UDA_MoveCamera* CurrentDA;
+	FMoveCameraData CurrentData;
 protected:
 	//scene
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -81,5 +81,5 @@ public:
 	void SetTargetRotation(FRotator NewRotation);
 	bool IsRotating()const;
 
-	void ApplyCameraMove(const FPayloadContext* InEffectContext);
+	void ApplyCameraMove(const FMoveCameraContext* InEffectContext);
 };

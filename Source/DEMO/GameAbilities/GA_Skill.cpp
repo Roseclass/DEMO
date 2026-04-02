@@ -15,7 +15,9 @@
 UGA_Skill::UGA_Skill()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	NextDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
+	NextApplyGETriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextApplyGE");
+	NextReserveActionTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextReserveAction");
+	NextSpawnDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
 	CHelpers::GetClass<UGameplayEffect>(&CooldownGameplayEffectClass, "Blueprint'/Game/GAS/GE/GE_Cooldown.GE_Cooldown_C'");
 }
 
@@ -155,17 +157,22 @@ void UGA_Skill::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGamepl
 void UGA_Skill::InitAbility()
 {
 	MontageDataIdx = 0;
-	DamageDealerDataIdx = 0;
-	PayloadEventDataIdx = 0;
+	MoveCameraDataIdx = 0;
+	ApplyGEDataIdx = 0;
+	ReserveActionDataIdx = 0;
+	SpawnDamageDealerDataIdx = 0;
 
 	FTimerHandle WaitHandle;
 	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
 		{
 			FGameplayTagContainer tags;
-			tags.AddTag(EndTag);
 			tags.AddTag(NextMontageTriggerTag);
-			tags.AddTag(NextDamageDealerTriggerTag);
-			tags.AddTag(NextPayloadEventTriggerTag);
+			tags.AddTag(NextCameraMoveTriggerTag);
+			tags.AddTag(EndTag);
+			tags.AddTag(FXTriggerTag);
+			tags.AddTag(NextApplyGETriggerTag);
+			tags.AddTag(NextReserveActionTriggerTag);
+			tags.AddTag(NextSpawnDamageDealerTriggerTag);
 			UAT_SkillNotifyEvent* task = UAT_SkillNotifyEvent::CreateSkillNotifyEvent(this, NAME_None, tags);
 			task->EventReceived.AddDynamic(this, &UGA_Skill::EventReceived);
 
@@ -177,20 +184,7 @@ void UGA_Skill::InitAbility()
 			MontageDataIdx++;
 
 		}), MontageDatas[MontageDataIdx].StartDelay, false);
-	ExecutePayloadEvent();
-}
-
-void UGA_Skill::SpawnDamageDealer()
-{
-	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
-	FGameplayCueParameters gameplayCueParameters;
-
-	FSpawnDamageDealerContext* context = DamageDealerDatas[DamageDealerDataIdx++].Duplicate();
-	context->AddInstigator(GetCurrentActorInfo()->OwnerActor.Get(), GetCurrentActorInfo()->AvatarActor.Get());
-	context->TargetActor = asc->GetTarget();
-
-	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
-	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
+	MoveCamera();
 }
 
 void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)
@@ -210,14 +204,29 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 		++MontageDataIdx;
 		return;
 	}
-	else if (EventTag == NextDamageDealerTriggerTag)
+	else if (EventTag == NextCameraMoveTriggerTag)
 	{
-		SpawnDamageDealer();
+		MoveCamera();
 		return;
 	}
-	else if (EventTag == NextPayloadEventTriggerTag)
+	else if (EventTag.MatchesTag(FXTriggerTag))
 	{
-		ExecutePayloadEvent();
+		SpawnFX(EventTag);
+		return;
+	}
+	else if (EventTag == NextApplyGETriggerTag)
+	{
+		ApplyGE();
+		return;
+	}
+	else if (EventTag == NextReserveActionTriggerTag)
+	{
+		ReserveAction();
+		return;
+	}
+	else if (EventTag == NextSpawnDamageDealerTriggerTag)
+	{
+		SpawnDamageDealer();
 		return;
 	}
 }
@@ -225,6 +234,84 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 void UGA_Skill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UGA_Skill::SpawnFX(FGameplayTag InTag)
+{
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	for (auto ch : asc->GetTargets())
+	{
+		FTurnBasedEffectContext* context = new FTurnBasedEffectContext();
+		context->EffectSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+		context->EffectCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+		context->EffectTargetActor = ch;
+
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		gameplayCueParameters.OriginalTag = InTag;
+		asc->ExecuteGameplayCue(InTag, gameplayCueParameters);
+	}
+}
+
+void UGA_Skill::ApplyGE()
+{
+	UDA_GCNPayload* payload = EventPayloads.Get();
+	CheckTrue(!payload);
+	CheckTrue(!payload->ApplyGE.IsValidIndex(ApplyGEDataIdx));
+
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	FApplyGEContext* context = new FApplyGEContext();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	for (auto ch : asc->GetTargets())
+		context->EventTargetActors.Add(ch);
+	context->Data = payload->ApplyGE[ApplyGEDataIdx++];
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ApplyGE"), gameplayCueParameters);
+}
+
+void UGA_Skill::ReserveAction()
+{
+	UDA_GCNPayload* payload = EventPayloads.Get();
+	CheckTrue(!payload);
+	CheckTrue(!payload->ReserveAction.IsValidIndex(ReserveActionDataIdx));
+
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	FReserveActionContext* context = new FReserveActionContext();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	for (auto ch : asc->GetTargets())
+		context->EventTargetActors.Add(ch);
+	context->Data = payload->ReserveAction[ReserveActionDataIdx++];
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ReserveAction"), gameplayCueParameters);
+}
+
+void UGA_Skill::SpawnDamageDealer()
+{
+	UDA_GCNPayload* payload = EventPayloads.Get();
+	CheckTrue(!payload);
+	CheckTrue(!payload->SpawnDamageDealer.IsValidIndex(SpawnDamageDealerDataIdx));
+
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	FSpawnDamageDealerContext* context = new FSpawnDamageDealerContext();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	for (auto ch : asc->GetTargets())
+		context->EventTargetActors.Add(ch);
+	context->Data = payload->SpawnDamageDealer[SpawnDamageDealerDataIdx++];
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
 }
 
 float UGA_Skill::GetCooldown(const FGameplayAbilityActorInfo* ActorInfo) const

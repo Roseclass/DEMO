@@ -78,16 +78,16 @@ void ATurnBasedPhaseManager::CreateRootWidget()
 
 	TFunction<void(FGameplayTag)> enter = [this](FGameplayTag InSkillTag)
 	{
+		if (CurrentStage != EActionStage::SelectSkill)return;
 		CurrentSelectedSkillTag = InSkillTag;
-		if(CurrentStage == EActionStage::SelectSkill)
 			CurrentTurnCharacter->OnAnimTagChanged.Broadcast(InSkillTag);
 	};
 	select->OnSkillIconMouseEnter.BindLambda(enter);
 
 	TFunction<void(FGameplayTag)> leave = [this](FGameplayTag InSkillTag)
 	{
+		if (CurrentStage != EActionStage::SelectSkill)return;
 		CurrentSelectedSkillTag = InSkillTag;
-		if (CurrentStage == EActionStage::SelectSkill)
 			CurrentTurnCharacter->OnAnimTagChanged.Broadcast(InSkillTag);
 	};
 	select->OnSkillIconMouseLeave.BindLambda(leave);
@@ -164,7 +164,8 @@ void ATurnBasedPhaseManager::OnSpawnedCharacterEndCursorOver(AActor* TouchedActo
 	CheckTrue(CurrentStage != EActionStage::SelectTarget);
 	ATurnBasedCharacter* ch = Cast<ATurnBasedCharacter>(TouchedActor);
 	CheckTrue_Print(!ch, "ch cast failed!!");
-	ch->ApplyHighlight(EHighlightType::Gray);
+	if(!TargetCharacters.Contains(TouchedActor))
+		ch->ApplyHighlight(EHighlightType::Gray);
 }
 
 void ATurnBasedPhaseManager::OnSpawnedCharacterClicked(AActor* TouchedActor, FKey ButtonPressed)
@@ -173,7 +174,7 @@ void ATurnBasedPhaseManager::OnSpawnedCharacterClicked(AActor* TouchedActor, FKe
 	CheckTrue_Print(!ch, "ch cast failed!!");
 	CheckTrue(ButtonPressed != EKeys::LeftMouseButton);
 
-	TargetCharacters.AddUnique(ch);
+	TargetCharacters.Add(ch);
 	
 	if (FMath::IsNearlyEqual(TargetCharacters.Num(), TargetGoalCount))
 	{
@@ -242,46 +243,32 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeAfterCurrentAction()
 	if (ReservedActions[EReservedActionTiming::AfterCurrentAction].IsEmpty())
 		return EReservedActionType::MAX;
 
-	FPayloadContext context = ReservedActions[EReservedActionTiming::AfterCurrentAction][0];
-	ReservedActions[EReservedActionTiming::AfterCurrentAction].RemoveAt(0);
-	UDA_ActionReservation* payload = Cast<UDA_ActionReservation>(context.Payload);
+	FReservedAction reservedAction = ReservedActions[EReservedActionTiming::AfterCurrentAction][0];
 
-	if (!payload)
+	if (!reservedAction.Instigator)
 	{
-		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() payload is nullptr", -1, 10, FColor::Red);
+		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() Instigator is nullptr!!", -1, 10, FColor::Red);
 		return EReservedActionType::MAX;
 	}
 
-	if (payload->Type == EReservedActionType::ExtraTurn)
+	if (!reservedAction.TargetCharacters.IsEmpty())
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() TargetCharacters is empty!!", -1, 10, FColor::Red);
+		return EReservedActionType::MAX;
+	}
+
+	if (reservedAction.Type == EReservedActionType::ExtraTurn)
 	{
 		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() Type is ExtraTurn", -1, 10, FColor::Red);
 		return EReservedActionType::MAX;
 	}
-	else if (payload->Type == EReservedActionType::ExtraSkill)
+	else if (reservedAction.Type == EReservedActionType::ExtraSkill)
 	{
 		CLog::Print("NICE", -1, 10, FColor::Purple);
-		ATurnBasedCharacter* instigator = nullptr;
-		if (payload->Instigator == EPayloadActorType::RuleSource)
-			instigator = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if(payload->Instigator == EPayloadActorType::EventCauser)
-			instigator = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if(payload->Instigator == EPayloadActorType::EventTarget)
-			instigator = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		ATurnBasedCharacter* target = nullptr;
-		if (payload->Target == EPayloadActorType::RuleSource)
-			target = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if(payload->Target == EPayloadActorType::EventCauser)
-			target = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if(payload->Target == EPayloadActorType::EventTarget)
-			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		TArray<ATurnBasedCharacter*> targets;
-		targets.Add(target);
-		PlaySequence(payload->SkillTag, instigator, targets, 1);
+		PlaySequence(reservedAction.SkillTag, reservedAction.Instigator, reservedAction.TargetCharacters, 1);
 	}
 
-	return payload->Type;
+	return reservedAction.Type;
 }
 
 EReservedActionType ATurnBasedPhaseManager::ConsumeStartOfNextTurn()
@@ -289,56 +276,45 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeStartOfNextTurn()
 	if (ReservedActions[EReservedActionTiming::StartOfNextTurn].IsEmpty())
 		return EReservedActionType::MAX;
 
-	FPayloadContext context = ReservedActions[EReservedActionTiming::StartOfNextTurn][0];
-	ReservedActions[EReservedActionTiming::StartOfNextTurn].RemoveAt(0);
-	UDA_ActionReservation* payload = Cast<UDA_ActionReservation>(context.Payload);
+	FReservedAction reservedAction = ReservedActions[EReservedActionTiming::StartOfNextTurn][0];
 
-	if (!payload)
+	if (!reservedAction.Instigator)
 	{
-		CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() payload is nullptr", -1, 10, FColor::Red);
+		CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() Instigator is nullptr!!", -1, 10, FColor::Red);
 		return EReservedActionType::MAX;
 	}
 
-	if (payload->Type == EReservedActionType::ExtraTurn)
+	if (reservedAction.Type == EReservedActionType::ExtraTurn)
 	{
-		if (payload->Target == EPayloadActorType::EventCauser)
-			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.EventCauserActor.Get());
-		else if (payload->Target == EPayloadActorType::EventTarget)
-			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.EventTargetActor.Get());
-		else if (payload->Target == EPayloadActorType::RuleSource)
-			CurrentTurnCharacter = Cast<ATurnBasedCharacter>(context.RuleSourceActor.Get());
+		if (0 < reservedAction.TargetCharacters.Num())
+			CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() TargetCharacters.Num() is over zero!!", -1, 10, FColor::Red);
+
+		if (!reservedAction.TargetCharacters.IsEmpty())
+		{
+			CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() TargetCharacters is empty!!", -1, 10, FColor::Red);
+			return EReservedActionType::MAX;
+		}
+
+		CurrentTurnCharacter = reservedAction.TargetCharacters[0];
 
 		if (!CurrentTurnCharacter)
 		{
 			CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() CurrentTurnCharacter is nullptr", -1, 10, FColor::Red);
 			return EReservedActionType::MAX;
 		}
+
 	}
-	else if (payload->Type == EReservedActionType::ExtraSkill)
+	else if (reservedAction.Type == EReservedActionType::ExtraSkill)
 	{
-		CLog::Print("NICE", -1, 10, FColor::Purple);
-		ATurnBasedCharacter* instigator = nullptr;
-		if (payload->Instigator == EPayloadActorType::RuleSource)
-			instigator = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if (payload->Instigator == EPayloadActorType::EventCauser)
-			instigator = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if (payload->Instigator == EPayloadActorType::EventTarget)
-			instigator = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		ATurnBasedCharacter* target = nullptr;
-		if (payload->Target == EPayloadActorType::RuleSource)
-			target = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if (payload->Target == EPayloadActorType::EventCauser)
-			target = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if (payload->Target == EPayloadActorType::EventTarget)
-			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		TArray<ATurnBasedCharacter*> targets;
-		targets.Add(target);
-		PlaySequence(payload->SkillTag, instigator, targets, 1);
+		if (!reservedAction.TargetCharacters.IsEmpty())
+		{
+			CLog::Print("ATurnBasedPhaseManager::ConsumeStartOfNextTurn() TargetCharacters is empty!!", -1, 10, FColor::Red);
+			return EReservedActionType::MAX;
+		}
+		PlaySequence(reservedAction.SkillTag, reservedAction.Instigator, reservedAction.TargetCharacters, 1);
 	}
 
-	return payload->Type;
+	return reservedAction.Type;
 }
 
 EReservedActionType ATurnBasedPhaseManager::ConsumeEndOfTurn()
@@ -346,46 +322,32 @@ EReservedActionType ATurnBasedPhaseManager::ConsumeEndOfTurn()
 	if (ReservedActions[EReservedActionTiming::EndOfTurn].IsEmpty())
 		return EReservedActionType::MAX;
 
-	FPayloadContext context = ReservedActions[EReservedActionTiming::EndOfTurn][0];
-	ReservedActions[EReservedActionTiming::EndOfTurn].RemoveAt(0);
-	UDA_ActionReservation* payload = Cast<UDA_ActionReservation>(context.Payload);
+	FReservedAction reservedAction = ReservedActions[EReservedActionTiming::EndOfTurn][0];
 
-	if (!payload)
+	if (!reservedAction.Instigator)
 	{
-		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() payload is nullptr", -1, 10, FColor::Red);
+		CLog::Print("ATurnBasedPhaseManager::ConsumeEndOfTurn() Instigator is nullptr!!", -1, 10, FColor::Red);
 		return EReservedActionType::MAX;
 	}
 
-	if (payload->Type == EReservedActionType::ExtraTurn)
+	if (!reservedAction.TargetCharacters.IsEmpty())
 	{
-		CLog::Print("ATurnBasedPhaseManager::ConsumeAfterCurrentAction() Type is ExtraTurn", -1, 10, FColor::Red);
+		CLog::Print("ATurnBasedPhaseManager::ConsumeEndOfTurn() TargetCharacters is empty!!", -1, 10, FColor::Red);
 		return EReservedActionType::MAX;
 	}
-	else if (payload->Type == EReservedActionType::ExtraSkill)
+
+	if (reservedAction.Type == EReservedActionType::ExtraTurn)
+	{
+		CLog::Print("ATurnBasedPhaseManager::ConsumeEndOfTurn() Type is ExtraTurn", -1, 10, FColor::Red);
+		return EReservedActionType::MAX;
+	}
+	else if (reservedAction.Type == EReservedActionType::ExtraSkill)
 	{
 		CLog::Print("NICE", -1, 10, FColor::Purple);
-		ATurnBasedCharacter* instigator = nullptr;
-		if (payload->Instigator == EPayloadActorType::RuleSource)
-			instigator = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if (payload->Instigator == EPayloadActorType::EventCauser)
-			instigator = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if (payload->Instigator == EPayloadActorType::EventTarget)
-			instigator = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		ATurnBasedCharacter* target = nullptr;
-		if (payload->Target == EPayloadActorType::RuleSource)
-			target = Cast<ATurnBasedCharacter>(context.RuleSourceActor);
-		else if (payload->Target == EPayloadActorType::EventCauser)
-			target = Cast<ATurnBasedCharacter>(context.EventCauserActor);
-		else if (payload->Target == EPayloadActorType::EventTarget)
-			target = Cast<ATurnBasedCharacter>(context.EventTargetActor);
-
-		TArray<ATurnBasedCharacter*> targets;
-		targets.Add(target);
-		PlaySequence(payload->SkillTag, instigator, targets, 1);
+		PlaySequence(reservedAction.SkillTag, reservedAction.Instigator, reservedAction.TargetCharacters, 1);
 	}
 
-	return payload->Type;
+	return reservedAction.Type;
 }
 
 void ATurnBasedPhaseManager::HandleStageTransition()
@@ -676,16 +638,9 @@ void ATurnBasedPhaseManager::SelectTarget()
 void ATurnBasedPhaseManager::PlaySequence(FGameplayTag SkillTag, ATurnBasedCharacter* SkillOwner, TArray<ATurnBasedCharacter*> Targets, bool Extra)
 {
 	UAbilityComponent* asc = Cast<UAbilityComponent>(SkillOwner->GetAbilitySystemComponent());
-	TArray<FGameplayAbilitySpec>& abilities = asc->GetActivatableAbilities();
-	for (auto& spec : abilities)
-	{
-		const UGA_Skill* skill = Cast<UGA_Skill>(spec.Ability);
-		if (!skill)continue;
-		if (skill->GetSkillTag() != SkillTag)continue;
-		asc->SetTargets(Targets);
-		asc->TryActivateAbility(spec.Handle);
-		break;
-	}
+	FGameplayAbilitySpec* spec = asc->FindAbilitySpecFromSkillTag(SkillTag);
+	asc->SetTargets(Targets);
+	asc->TryActivateAbility(spec->Handle);
 	if (!Extra)
 	{
 		// 추가 이벤트 판정
@@ -694,7 +649,6 @@ void ATurnBasedPhaseManager::PlaySequence(FGameplayTag SkillTag, ATurnBasedChara
 			FEffectEventContext* eec = new FEffectEventContext();
 			eec->EventCauserActor = SkillOwner;
 			eec->EventTargetActor = target;
-			//eec->EventTargetActors.Add(Target);
 
 			UTurnBasedSubsystem* TBS = GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();
 			TBS->SolveHitEvent(eec);
@@ -848,41 +802,27 @@ void ATurnBasedPhaseManager::RequestSpawnCharacter(uint8 TeamID, UTurnBasedChara
 	TrySpawnCharacter();
 }
 
-void ATurnBasedPhaseManager::ApplyCameraMove(const FPayloadContext* InEffectContext)
+void ATurnBasedPhaseManager::ApplyGE(const FApplyGEContext* InEffectContext)
 {
-	Camera->ApplyCameraMove(InEffectContext);
-}
-
-void ATurnBasedPhaseManager::ReserveAction(const FPayloadContext* InEffectContext)
-{
-	UDA_ActionReservation* da = Cast<UDA_ActionReservation>(InEffectContext->Payload);	
-	CheckTrue_Print(!da, "da is nullptr");
-
-	ReservedActions.FindOrAdd(da->Timing).Add(*InEffectContext);
-}
-
-void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
-{
-	UDA_ApplyGE* da = Cast<UDA_ApplyGE>(InEffectContext->Payload);
-	CheckTrue_Print(!da, "da is nullptr");
+	const FApplyGEData& data = InEffectContext->Data;
 
 	ATurnBasedCharacter* causer = Cast<ATurnBasedCharacter>(InEffectContext->EventCauserActor.Get());;
 	ATurnBasedCharacter* base = nullptr;
 	TArray<ATurnBasedCharacter*> targets;
 
-	if (da->ReferenceActor == EPayloadActorType::RuleSource)
+	if (data.ReferenceActor == EPayloadActorType::RuleSource)
 		base = Cast<ATurnBasedCharacter>(InEffectContext->RuleSourceActor.Get());
-	else if (da->ReferenceActor == EPayloadActorType::EventCauser)
+	else if (data.ReferenceActor == EPayloadActorType::EventCauser)
 		base = Cast<ATurnBasedCharacter>(InEffectContext->EventCauserActor.Get());
-	else if (da->ReferenceActor == EPayloadActorType::EventTarget)
-		base = Cast<ATurnBasedCharacter>(InEffectContext->EventTargetActor.Get());
+	else if (data.ReferenceActor == EPayloadActorType::EventTargets)
+		base = Cast<ATurnBasedCharacter>(InEffectContext->EventTargetActors[UKismetMathLibrary::RandomIntegerInRange(0, InEffectContext->EventTargetActors.Num() - 1)]);
 
 	CheckTrue_Print(!causer, "causer cast fail");
 	CheckTrue_Print(!base, "base cast fail");
 	{
 		TArray<ATurnBasedCharacter*> temp;
 
-		if (da->TeamCondition == EPayloadReferenceTeamCondition::All)
+		if (data.TeamCondition == EPayloadReferenceTeamCondition::All)
 		{
 			for (auto set : SpawnedCharacterMap)
 				for (auto ch : set.Value)
@@ -891,7 +831,7 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 					temp.Add(ch);
 				}
 		}
-		else if (da->TeamCondition == EPayloadReferenceTeamCondition::Ally)
+		else if (data.TeamCondition == EPayloadReferenceTeamCondition::Ally)
 		{
 			for (auto ch : SpawnedCharacterMap[base->GetGenericTeamId()])
 			{
@@ -899,7 +839,7 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 				temp.Add(ch);
 			}
 		}
-		else if (da->TeamCondition == EPayloadReferenceTeamCondition::Enemy)
+		else if (data.TeamCondition == EPayloadReferenceTeamCondition::Enemy)
 		{
 			for (auto ch : SpawnedCharacterMap[base->GetGenericTeamId() ^ 1])
 			{
@@ -907,14 +847,14 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 				temp.Add(ch);
 			}
 		}
-		else if (da->TeamCondition == EPayloadReferenceTeamCondition::Self)
+		else if (data.TeamCondition == EPayloadReferenceTeamCondition::Self)
 			temp.Add(base);
 
-		if (da->SelectCondition == EPayloadReferenceSelectCondition::All)
+		if (data.SelectCondition == EPayloadReferenceSelectCondition::All)
 			targets = temp;
-		else if (da->SelectCondition == EPayloadReferenceSelectCondition::Random)
+		else if (data.SelectCondition == EPayloadReferenceSelectCondition::Random)
 		{
-			for (int32 i = 0; i < da->GoalCount; i++)
+			for (int32 i = 0; i < data.GoalCount; i++)
 			{
 				if (!temp.Num())break;
 				int32 idx = UKismetMathLibrary::RandomIntegerInRange(0, temp.Num() - 1);
@@ -923,8 +863,8 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 			}
 		}
 		else if (
-			da->SelectCondition == EPayloadReferenceSelectCondition::Highest ||
-			da->SelectCondition == EPayloadReferenceSelectCondition::Lowest)
+			data.SelectCondition == EPayloadReferenceSelectCondition::Highest ||
+			data.SelectCondition == EPayloadReferenceSelectCondition::Lowest)
 		{
 			TArray<TTuple<float, ATurnBasedCharacter*>> sort;
 			for (auto ch : temp)
@@ -932,7 +872,7 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 				UAbilityComponent* asc = Cast<UAbilityComponent>(ch->GetAbilitySystemComponent());
 				if (!asc)continue;
 				float value = 0;
-				switch (da->AttributeCondition)
+				switch (data.AttributeCondition)
 				{
 				case EPayloadReferenceAttributeCondition::Health:
 					value = asc->GetHealth(); break;
@@ -942,9 +882,9 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 				sort.Add({ value,ch });
 			}
 			sort.Sort();
-			int32 idx = da->SelectCondition == EPayloadReferenceSelectCondition::Highest ? sort.Num() - 1 : 0;
-			int32 add = da->SelectCondition == EPayloadReferenceSelectCondition::Highest ? -1 : 1;
-			int32 cnt = da->GoalCount;
+			int32 idx = data.SelectCondition == EPayloadReferenceSelectCondition::Highest ? sort.Num() - 1 : 0;
+			int32 add = data.SelectCondition == EPayloadReferenceSelectCondition::Highest ? -1 : 1;
+			int32 cnt = data.GoalCount;
 			while (cnt-- && sort.IsValidIndex(idx))
 			{
 				targets.Add(sort[idx].Value);
@@ -955,7 +895,7 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 
 	for (auto target : targets)
 	{
-		FExecutionContext* context = new FExecutionContext();
+		FTurnBasedEffectContext* context = new FTurnBasedEffectContext();
 		context->EffectSourceActor = InEffectContext->RuleSourceActor.Get();
 		context->EffectCauserActor = InEffectContext->EventCauserActor.Get();
 		context->EffectTargetActor = target;
@@ -966,12 +906,8 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 		FGameplayEffectContextHandle EffectContextHandle = FGameplayEffectContextHandle(context);
 		EffectContextHandle.AddInstigator(InEffectContext->EventCauserActor.Get(), InEffectContext->EventCauserActor.Get());
 
-		FGameplayEffectSpecHandle handle =
-			causer->GetAbilitySystemComponent()->MakeOutgoingSpec(
-				da->GE,
-				UGameplayEffect::INVALID_LEVEL,
-				EffectContextHandle);
-		handle.Data.Get()->StackCount = da->StackCount;
+		FGameplayEffectSpecHandle handle = causer->GetAbilitySystemComponent()->MakeOutgoingSpec(data.GE,UGameplayEffect::INVALID_LEVEL,EffectContextHandle);
+		handle.Data.Get()->StackCount = data.StackCount;
 
 		causer->GetAbilitySystemComponent()->ApplyGameplayEffectSpecToTarget(*handle.Data, target->GetAbilitySystemComponent());
 	}
@@ -979,9 +915,88 @@ void ATurnBasedPhaseManager::ApplyGE(const FPayloadContext* InEffectContext)
 
 }
 
-void ATurnBasedPhaseManager::ChangeTarget(ATurnBasedCharacter* InTarget)
+void ATurnBasedPhaseManager::ApplyCameraMove(const FMoveCameraContext* InEffectContext)
 {
-	TargetCharacter = InTarget;
+	Camera->ApplyCameraMove(InEffectContext);
+}
+
+void ATurnBasedPhaseManager::ReserveAction(const FReserveActionContext* InEffectContext)
+{
+	FReserveActionData data = InEffectContext->Data;
+	FReservedAction action;
+	action.Type = data.Type;
+	action.SkillTag = data.SkillTag;
+	{
+		CLog::Print("NICE", -1, 10, FColor::Purple);
+
+		if (data.Instigator == EPayloadActorType::RuleSource)
+			action.Instigator = Cast<ATurnBasedCharacter>(InEffectContext->RuleSourceActor);
+		else if (data.Instigator == EPayloadActorType::EventCauser)
+			action.Instigator = Cast<ATurnBasedCharacter>(InEffectContext->EventCauserActor);
+		else if (data.Instigator == EPayloadActorType::EventTargets)
+		{
+			for (auto actor : InEffectContext->EventTargetActors)
+			{
+				action.Instigator = Cast<ATurnBasedCharacter>(actor);
+				if (!action.Instigator)continue;
+
+				action.TargetCharacters.Empty();
+				if (data.Target == EPayloadActorType::RuleSource)
+					action.TargetCharacters.Add(Cast<ATurnBasedCharacter>(InEffectContext->RuleSourceActor));
+				else if (data.Target == EPayloadActorType::EventCauser)
+					action.TargetCharacters.Add(Cast<ATurnBasedCharacter>(InEffectContext->EventCauserActor));
+				else if (data.Target == EPayloadActorType::EventTargets)
+				{
+					for (auto ch : InEffectContext->EventTargetActors)
+					{
+						ATurnBasedCharacter* target = Cast<ATurnBasedCharacter>(ch);
+						if (!target)continue;
+						action.TargetCharacters.Add(target);
+					}
+				}
+				ReservedActions.FindOrAdd(data.Timing).Add(action);
+			}
+			return;
+		}
+
+		if (data.Target == EPayloadActorType::RuleSource)
+			action.TargetCharacters.Add(Cast<ATurnBasedCharacter>(InEffectContext->RuleSourceActor));
+		else if (data.Target == EPayloadActorType::EventCauser)
+			action.TargetCharacters.Add(Cast<ATurnBasedCharacter>(InEffectContext->EventCauserActor));
+		else if (data.Target == EPayloadActorType::EventTargets)
+		{
+			for (auto ch : InEffectContext->EventTargetActors)
+			{
+				ATurnBasedCharacter* target = Cast<ATurnBasedCharacter>(ch);
+				if (!target)continue;
+				action.TargetCharacters.Add(target);
+			}
+		}
+		ReservedActions.FindOrAdd(data.Timing).Add(action);
+	}
+}
+
+void ATurnBasedPhaseManager::ChangeTarget(TArray<ATurnBasedCharacter*> PreTargets, ATurnBasedCharacter* NewTarget)
+{
+	for (int32 i = 0; i < TargetCharacters.Num(); i++)
+		for (int32 j = 0; j < PreTargets.Num(); j++)
+			if (TargetCharacters[i] == PreTargets[j])
+				TargetCharacters[i] = NewTarget;
+}
+
+void ATurnBasedPhaseManager::EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext)
+{
+	for (auto tuple : SpawnedCharacterMap)
+	{
+		for (auto ch : tuple.Value)
+		{
+			if (InEffectContext->EventCauserActor == ch)
+			{
+				ch->EnqueueScriptedMove(InEffectContext);
+				return;
+			}
+		}
+	}
 }
 
 const TSet<ATurnBasedCharacter*>& ATurnBasedPhaseManager::GetPlayerCharacters() const

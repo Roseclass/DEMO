@@ -35,7 +35,10 @@ public:
 	//property
 private:
 protected:
-	int32 DamageDealerDataIdx;
+	int32 ApplyGEDataIdx;
+	int32 ReserveActionDataIdx;
+	int32 SpawnDamageDealerDataIdx;
+
 	UPROPERTY(EditAnywhere, Category = "Data")
 		TArray<FSpawnDamageDealerContext> DamageDealerDatas;
 
@@ -58,7 +61,16 @@ public:
 		FGameplayTag SkillTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
-		FGameplayTag NextDamageDealerTriggerTag;
+		FGameplayTag FXTriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextApplyGETriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextReserveActionTriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextSpawnDamageDealerTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTagContainer CooldownTags;
@@ -69,9 +81,13 @@ private:
 protected:
 	virtual void InitAbility()override;
 
-	virtual void SpawnDamageDealer();
 	virtual void EventReceived(FGameplayTag EventTag, FGameplayEventData EventData)override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)override;
+	
+	virtual void SpawnFX(FGameplayTag InTag);
+	virtual void ApplyGE();
+	virtual void ReserveAction();
+	virtual void SpawnDamageDealer();
 
 	virtual float GetCooldown(const FGameplayAbilityActorInfo* ActorInfo)const;
 	virtual float GetCost(const FGameplayAbilityActorInfo* ActorInfo)const;
@@ -107,4 +123,23 @@ public:
 * 
 * 현재 SelectSkill 부분에서 액티브가 가능하면 전부 UI슬롯에 올려둔다.
 * 스킬 슬롯 배치를 할때 액티브 가능 여부를 수정해야함
+*/
+
+
+/*
+gideon,morigesh,terra fx rule 마무리
+revenantmarkfx stack 연출 딜레이 필요함
+gideonhealfx merge
+
+scriptedmove test
+sidebar연동, health turngauge 연동
+minion추가
+
+카메라 시스템 마무리
+
+death핸들 촘촘하게,승리패배판정 다시테스트
+tps<->tb 오류있는지 검사
+tb필드에선 tps 인풋 안먹게
+배경,prop추가
+순서로 진행하고 이거 다 마무리하면 완성임
 */

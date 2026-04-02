@@ -7,6 +7,7 @@
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
+#include "GameAbilities/GameplayEffectPayloads.h"
 #include "GameplayEffectContexts.generated.h"
 
 /**
@@ -15,22 +16,97 @@
 
 //#include "GameAbilities/GameplayEffectContexts.h"
 
-class ADamageDealer;
 
 USTRUCT(BlueprintType)
-struct FDamageDealerTriggerData
+struct FTurnBasedEffectContext : public FGameplayEffectContext
 {
     GENERATED_BODY()
 public:
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        float Delay;
+    virtual FTurnBasedEffectContext* Duplicate() const override
+    {
+        FTurnBasedEffectContext* NewContext = new FTurnBasedEffectContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    TWeakObjectPtr<AActor> EffectSourceActor;            // 이펙트 출처 액터
+    TWeakObjectPtr<AActor> EffectCauserActor;            // 이펙트 생성 액터
+    TWeakObjectPtr<AActor> EffectTargetActor;            // 이펙트 적용 액터
+    TWeakObjectPtr<AActor> SkillCauserActor;             // 스킬 시전 액터
+    TArray<TWeakObjectPtr<AActor>> SkillTargetActors;    // 스킬 대상 액터
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FGameplayTag Tag;
+    TWeakObjectPtr<AActor> RuleSourceActor;             // 규칙/상태를 제공한 주체
+    TWeakObjectPtr<AActor> EventCauserActor;            // 트리거 사건 유발자
+    TArray<TWeakObjectPtr<AActor>> EventTargetActors;   // 현재 이벤트 대상
 };
 
-USTRUCT(BlueprintType)
-struct FSpawnDamageDealerContext : public FGameplayEffectContext
+USTRUCT()
+struct FApplyGEContext : public FTurnBasedEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FApplyGEContext* Duplicate() const override
+    {
+        FApplyGEContext* NewContext = new FApplyGEContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    FApplyGEData Data;
+};
+
+USTRUCT()
+struct FMoveCameraContext : public FTurnBasedEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FMoveCameraContext* Duplicate() const override
+    {
+        FMoveCameraContext* NewContext = new FMoveCameraContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    FMoveCameraData Data;
+};
+
+USTRUCT()
+struct FReserveActionContext : public FTurnBasedEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FReserveActionContext* Duplicate() const override
+    {
+        FReserveActionContext* NewContext = new FReserveActionContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    FReserveActionData Data;
+};
+
+USTRUCT()
+struct FSpawnDamageDealerContext : public FTurnBasedEffectContext
 {
     GENERATED_BODY()
 public:
@@ -46,37 +122,48 @@ public:
         return NewContext;
     }
 public:
-    TWeakObjectPtr<AActor> TargetActor;
+    FSpawnDamageDealerData Data;
+};
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TSubclassOf<ADamageDealer> Class;
+USTRUCT()
+struct FChangeTargetContext : public FTurnBasedEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FChangeTargetContext* Duplicate() const override
+    {
+        FChangeTargetContext* NewContext = new FChangeTargetContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    FChangeTargetData Data;
+};
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FName SocketName;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TArray<FDamageDealerTriggerData> ActivateTriggerDatas;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TArray<FDamageDealerTriggerData> CollisionTriggerDatas;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TArray<FDamageDealerTriggerData> DamageSendTriggerDatas;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TArray<FDamageDealerTriggerData> DeactivateTriggerDatas;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        bool bUseSocketLocation = 1;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-        float FrontDist;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-        float RightDist;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
-        float UpDist;
+USTRUCT()
+struct FScriptedMoveContext : public FTurnBasedEffectContext
+{
+    GENERATED_BODY()
+public:
+    virtual FScriptedMoveContext* Duplicate() const override
+    {
+        FScriptedMoveContext* NewContext = new FScriptedMoveContext();
+        *NewContext = *this;
+        if (GetHitResult())
+        {
+            // Does a deep copy of the hit result
+            NewContext->AddHitResult(*GetHitResult(), true);
+        }
+        return NewContext;
+    }
+public:
+    TWeakObjectPtr<AActor> MoveInstigator;
+    FScriptedMoveData Data;
 };
 
 USTRUCT(BlueprintType)
@@ -89,34 +176,6 @@ public:
     UPROPERTY()float BaseDamage;
     UPROPERTY()float CalculatedDamage;
     UPROPERTY()bool bIsCritical;
-};
-
-USTRUCT(BlueprintType)
-struct FPayloadContext : public FGameplayEffectContext
-{
-    GENERATED_BODY()
-public:
-    virtual FPayloadContext* Duplicate() const override
-    {
-        FPayloadContext* NewContext = new FPayloadContext();
-        *NewContext = *this;
-        if (GetHitResult())
-        {
-            // Does a deep copy of the hit result
-            NewContext->AddHitResult(*GetHitResult(), true);
-        }
-        return NewContext;
-    }
-public:
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FGameplayTag GCNTag;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        TObjectPtr<UPrimaryDataAsset> Payload;
-
-    TWeakObjectPtr<AActor> RuleSourceActor;     // 규칙/상태를 제공한 주체
-    TWeakObjectPtr<AActor> EventCauserActor;    // 트리거 사건 유발자
-    TWeakObjectPtr<AActor> EventTargetActor;    // 현재 이벤트 대상
 };
 
 USTRUCT(BlueprintType)

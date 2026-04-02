@@ -36,7 +36,7 @@ void ADamageDealer::Tick(float DeltaTime)
 		if (CurrentDamageTick < DamageTick)
 		{
 			DamageTick -= CurrentDamageTick;
-			SendDamage(GetDataContext().TargetActor.Get(), HitResult);
+			SendDamage(GetData().TargetActor.Get(), HitResult);
 		}
 	}
 }
@@ -53,7 +53,7 @@ void ADamageDealer::SendDamage(AActor* Target, const FHitResult& SweepResult)
 	UAbilityComponent* targetASC = Cast<UAbilityComponent>(hitCharacter->GetAbilitySystemComponent());
 	ApplyDamageGE(instigatorASC, targetASC, SweepResult);
 	ApplyAdditiveEffectData(instigatorASC, targetASC, SweepResult);
-	SendEvent(GetDataContext().DamageSendTriggerDatas, bSendDamageEvent);
+	SendEvent(GetData().DamageSendTriggerDatas, bSendDamageEvent);
 
 	if (MaxHitCount <= ++CurrentHitCount)
 		Deactivate();
@@ -64,7 +64,7 @@ void ADamageDealer::ApplyDamageGE(UAbilityComponent* InstigatorASC, UAbilityComp
 	CheckTrue_Print(!DamageGEClass, "DamageGEClass is nullptr!!");
 	if (InstigatorASC && TargetASC && DamageGEClass)
 	{
-		FExecutionContext* context = new FExecutionContext();
+		FTurnBasedEffectContext* context = new FTurnBasedEffectContext();
 		context->EffectCauserActor = InstigatorASC->GetAvatarActor();
 		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
 		context->EffectTargetActor = TargetASC->GetAvatarActor();
@@ -88,7 +88,7 @@ void ADamageDealer::ApplyAdditiveEffectData(UAbilityComponent* InstigatorASC, UA
 	CheckTrue(AdditiveEffectData.Rule == EDamageTriggerRule::OnFirstHit && 0 < CurrentHitCount);
 	if (InstigatorASC && TargetASC)
 	{
-		FExecutionContext* context = new FExecutionContext();
+		FTurnBasedEffectContext* context = new FTurnBasedEffectContext();
 		context->EffectCauserActor = InstigatorASC->GetAvatarActor();
 		context->EffectSourceActor = InstigatorASC->GetAvatarActor();
 		context->EffectTargetActor = TargetASC->GetAvatarActor();
@@ -114,7 +114,7 @@ void ADamageDealer::Activate()
 		FTimerDelegate::CreateLambda([&]()
 			{
 				bAct = 1;
-				SendEvent(GetDataContext().ActivateTriggerDatas, bActivateEvent);
+				SendEvent(GetData().ActivateTriggerDatas, bActivateEvent);
 			});
 	if (ActivateDelay <= 1e-9)
 	{
@@ -142,7 +142,7 @@ void ADamageDealer::SpawnNextDamageDealer()
 
 void ADamageDealer::Deactivate()
 {
-	SendEvent(GetDataContext().DeactivateTriggerDatas, bDeactivateEvent);
+	SendEvent(GetData().DeactivateTriggerDatas, bDeactivateEvent);
 
 	//deactivate
 	{
@@ -228,7 +228,7 @@ void ADamageDealer::SendEvent(const TArray<FDamageDealerTriggerData>& InDatas, b
 		FTimerDelegate func = 
 		FTimerDelegate::CreateLambda([&]()
 			{
-				ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(Data.GetInstigator());
+				ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(GetInstigator());
 				FGameplayEventData data;
 				UAbilitySystemComponent* asc = instigator->GetAbilitySystemComponent();
 				if (!asc)
@@ -249,7 +249,7 @@ void ADamageDealer::SendEvent(const TArray<FDamageDealerTriggerData>& InDatas, b
 	InFlag = 1;
 }
 
-void ADamageDealer::Init(const FSpawnDamageDealerContext* InData)
+void ADamageDealer::Init(const FSpawnDamageDealerData* InData)
 {
 	bApplyNextCameraMove = !bUseDeactivateCameraMove;
 	bPlayNextMontage = !bUseDeactivateMontage;

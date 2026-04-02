@@ -21,37 +21,71 @@ bool UGCN_SpawnDamageDealer::OnExecute_Implementation(AActor* MyTarget, const FG
 		return false;
 	}
 
-	ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(effectContext->GetInstigator());
+	ATurnBasedCharacter* instigator = Cast<ATurnBasedCharacter>(effectContext->EventCauserActor.Get());
 	if (!instigator)
 	{
 		CLog::Print("UGCN_SpawnDamageDealer::OnExecute_Implementation instigator cast failed!!");
 		return false;
 	}
 
-	FTransform transform;
-	if (effectContext->bUseSocketLocation)
-		transform.SetTranslation(instigator->GetMesh()->GetSocketLocation(effectContext->SocketName));
-	else
+	for (auto target : effectContext->EventTargetActors)
 	{
-		FVector loc = instigator->GetActorLocation();
-		loc += instigator->GetActorForwardVector() * effectContext->FrontDist;
-		loc += instigator->GetActorUpVector() * effectContext->UpDist;
-		loc += instigator->GetActorRightVector() * effectContext->RightDist;
-		transform.SetTranslation(loc);
+		FSpawnDamageDealerData data = effectContext->Data;
+		data.TargetActor = target;
+		float delay = UKismetMathLibrary::RandomFloatInRange(effectContext->Data.DelayMin, effectContext->Data.DelayMax);
+		FTimerDelegate func =
+			FTimerDelegate::CreateLambda([data, instigator]()
+				{
+
+					FTransform transform;
+					if (data.bUseSocketLocation)
+					{
+						transform.SetTranslation(instigator->GetMesh()->GetSocketLocation(data.SocketName));
+
+						if (data.bIsHoming)
+						{
+							FVector baseDir = (instigator->GetMesh()->GetSocketRotation(data.SocketName) + data.SpawnDirectionOffset).Vector();
+							FVector randomDir = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(baseDir, data.SpawnAngle);
+							transform.SetRotation(randomDir.ToOrientationQuat()); 
+						}
+					}
+					else
+					{
+						FVector loc = instigator->GetActorLocation();
+						loc += instigator->GetActorForwardVector() * data.FrontDist;
+						loc += instigator->GetActorUpVector() * data.UpDist;
+						loc += instigator->GetActorRightVector() * data.RightDist;
+						transform.SetTranslation(loc);
+
+						if (data.bIsHoming)
+						{
+							FVector baseDir = (instigator->GetActorRotation() + data.SpawnDirectionOffset).Vector();
+							FVector randomDir = UKismetMathLibrary::RandomUnitVectorInConeInDegrees(baseDir, data.SpawnAngle);
+							transform.SetRotation(randomDir.ToOrientationQuat());
+						}
+					}
+
+					if(!data.bIsHoming)
+						transform.SetRotation(FQuat(UKismetMathLibrary::FindLookAtRotation(transform.GetTranslation(), data.TargetActor.Get()->GetActorLocation())));
+
+					ADamageDealer* dealer = instigator->GetWorld()->SpawnActorDeferred<ADamageDealer>(
+						data.Class,
+						transform,
+						instigator,
+						instigator,
+						ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+
+					dealer->Init(&data);
+
+					UGameplayStatics::FinishSpawningActor(dealer, transform);
+				});
+		if (delay <= 1e-9)func.Execute();
+		else
+		{
+			FTimerHandle handle;
+			GetWorld()->GetTimerManager().SetTimer(handle, func, delay, false);
+		}
 	}
-
-	transform.SetRotation(FQuat(UKismetMathLibrary::FindLookAtRotation(transform.GetTranslation(), effectContext->TargetActor.Get()->GetActorLocation())));
-
-	ADamageDealer* dealer = GetWorld()->SpawnActorDeferred<ADamageDealer>(
-		effectContext->Class, 
-		transform, 
-		instigator,
-		instigator,
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-
-	dealer->Init(effectContext);
-
-	UGameplayStatics::FinishSpawningActor(dealer, transform);
 
 	return false;
 }

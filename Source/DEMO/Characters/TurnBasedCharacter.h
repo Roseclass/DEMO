@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/BaseCharacter.h"
 #include "Characters/TurnBasedCharacterData.h"
+#include "GameAbilities/GameplayEffectPayloads.h"
 #include "TurnBasedCharacter.generated.h"
 
 /**
@@ -10,6 +11,8 @@
  */
 
 class UTurnBasedCameraComponent;
+class UTBActiveFXComponent;
+struct FScriptedMoveContext;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAnimTagChanged, FGameplayTag);
 
@@ -32,6 +35,7 @@ public:
 
 	//property
 private:
+	TArray<FScriptedMoveData> PendingScriptedMoves;
 protected:
 	FTurnBasedCharacterRuntimeData RuntimeData;
 	//scene
@@ -39,6 +43,9 @@ protected:
 	//actor
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 		UTurnBasedCameraComponent* TurnBasedCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+		UTBActiveFXComponent* ActiveFX;
 
 public:
 	FOnAnimTagChanged OnAnimTagChanged;
@@ -48,10 +55,12 @@ private:
 protected:
 	virtual void InitAssets(UPrimaryDataAsset* DA);
 	virtual void InitGA(UPrimaryDataAsset* DA);
+	void ProcessScriptedMove(float DeltaTime);
 public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const override;
 
+	void EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext);
 	void ApplyHighlight(EHighlightType HighlightType);
 
 	//from runtime

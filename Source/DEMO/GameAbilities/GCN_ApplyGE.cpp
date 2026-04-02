@@ -12,7 +12,7 @@ UGCN_ApplyGE::UGCN_ApplyGE()
 
 bool UGCN_ApplyGE::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const
 {
-	const FPayloadContext* effectContext = static_cast<const FPayloadContext*>(Parameters.EffectContext.Get());
+	const FApplyGEContext* effectContext = static_cast<const FApplyGEContext*>(Parameters.EffectContext.Get());
 	if (!effectContext)return false;
 
 	UTurnBasedSubsystem* TBS = GetWorld()->GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();

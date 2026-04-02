@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "GameplayTagContainer.h"
-#include "GameAbilities/GameplayEffectPayloads.h"
+#include "GameAbilities/GameplayEffectContexts.h"
 #include "TurnBasedPhaseManager.generated.h"
 
 /**
@@ -38,6 +38,17 @@ enum class EActionStage : uint8
 	MAX UMETA(meta = (Hidden))
 };
 
+USTRUCT()
+struct FReservedAction
+{
+	GENERATED_BODY()
+public:
+	ATurnBasedCharacter* Instigator;
+	TArray<ATurnBasedCharacter*> TargetCharacters;
+	EReservedActionType Type;
+	FGameplayTag SkillTag;
+};
+
 UCLASS()
 class DEMO_API ATurnBasedPhaseManager : public AActor
 {
@@ -58,7 +69,7 @@ private:
 	EActionStage NextStage = EActionStage::MAX;
 	TArray<FActiveGameplayEffectHandle> DoTHandles;
 
-	TMap<EReservedActionTiming, TArray<FPayloadContext>>ReservedActions;
+	TMap<EReservedActionTiming, TArray<FReservedAction>>ReservedActions;
 
 	ATurnbasedPhaseCamera* Camera;
 
@@ -127,10 +138,11 @@ public:
 	void RequestSpawnCharacter(uint8 TeamID, UTurnBasedCharacterData* InData);
 
 public: // for subsystem
-	void ApplyCameraMove(const FPayloadContext* InEffectContext);
-	void ReserveAction(const FPayloadContext* InEffectContext);
-	void ApplyGE(const FPayloadContext* InEffectContext);
-	void ChangeTarget(ATurnBasedCharacter* InTarget);
+	void ApplyGE(const FApplyGEContext* InEffectContext);
+	void ApplyCameraMove(const FMoveCameraContext* InEffectContext);
+	void ReserveAction(const FReserveActionContext* InEffectContext);
+	void ChangeTarget(TArray<ATurnBasedCharacter*> PreTargets, ATurnBasedCharacter* NewTarget);
+	void EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext);
 
 	const TSet<ATurnBasedCharacter*>& GetPlayerCharacters() const;
 	const TSet<ATurnBasedCharacter*>& GetEnemyCharacters() const;

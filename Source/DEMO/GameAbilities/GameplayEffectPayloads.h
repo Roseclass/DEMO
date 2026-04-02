@@ -8,7 +8,7 @@
 #include "Engine/DataAsset.h"
 #include "Engine/DataTable.h"
 
-#include "GameAbilities/GameplayEffectContexts.h"
+//#include "GameAbilities/GameplayEffectPayloads.h"
 
 #include "GameplayEffectPayloads.generated.h"
 
@@ -16,15 +16,22 @@
  * 
  */
 
-//#include "GameAbilities/GameplayEffectPayloads.h"
-
 UENUM(BlueprintType)
 enum class EPayloadActorType : uint8
 {
     RuleSource,
     EventCauser,
-    EventTarget,
     EventTargets,
+    MAX UMETA(meta = (Hidden))
+};
+
+UENUM(BlueprintType)
+enum class EPayloadActorSelectType  : uint8
+{
+    Random,
+    First,
+    Center,
+    Last,
     MAX UMETA(meta = (Hidden))
 };
 
@@ -230,55 +237,257 @@ public:
         ECameraSkillType SkillType;
 };
 
-////
-//// Effect Event Rule
-////
-
-UENUM(BlueprintType)
-enum class EEffectEventResultType : uint8
+USTRUCT(BlueprintType)
+struct FApplyGEData
 {
-    ReserveTurn,
-    ReserveSkill,
-    MAX UMETA(meta = (Hidden))
-};
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Condition")
+        EPayloadActorType ReferenceActor;
 
-UENUM(BlueprintType)
-enum class EEffectEventPhase : uint8
-{
-    Pre,
-    Hit,
-    MAX UMETA(meta = (Hidden))
-};
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Condition")
+        EPayloadReferenceTeamCondition TeamCondition;
 
-UENUM(BlueprintType)
-enum class EEffectEventTriggerCondition : uint8
-{
-    Always,
-    TriggeredBySource,
-    TriggeredByOther,
-    MAX UMETA(meta = (Hidden))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Condition", meta = (EditCondition = "TeamCondition != EPayloadReferenceTeamCondition::Self", EditConditionHides))
+        EPayloadReferenceSelectCondition SelectCondition;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Condition", meta = (EditCondition = "SelectCondition == EPayloadReferenceSelectCondition::Highest||SelectCondition == EPayloadReferenceSelectCondition::Lowest", EditConditionHides))
+        EPayloadReferenceAttributeCondition AttributeCondition;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Condition", meta = (ClampMin = 1.00, EditCondition = "SelectCondition != EPayloadReferenceSelectCondition::All", EditConditionHides))
+        int32 GoalCount = 1;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "GE")
+        TSubclassOf<UGameplayEffect> GE;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "GE")
+        int32 StackCount = 1;
+
 };
 
 USTRUCT(BlueprintType)
-struct FEffectEventRule : public FTableRowBase
+struct FMoveCameraData
 {
     GENERATED_BODY()
 public:
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FGameplayTag TargetGrantedTag;
+        EPayloadActorType ShotOrigin;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FGameplayTag InstigatorGrantedTag;
+        ECameraShotType ShotType;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        FPayloadContext TriggerContext;
+        ECameraLookAtType LookAtType;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        EEffectEventPhase EventPhase;
+        ECameraEventType EventType;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        EEffectEventTriggerCondition TriggerCondition;
+        ECameraSkillType SkillType;
+
+};
+
+USTRUCT(BlueprintType)
+struct FReserveActionData
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "Type == EReservedActionType::ExtraSkill", EditConditionHides))
+        EPayloadActorType Instigator;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        EEffectEventResultType Result;
+        EPayloadActorType Target;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        EReservedActionTiming Timing;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        EReservedActionType Type;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "Type == EReservedActionType::ExtraSkill", EditConditionHides))
+        FGameplayTag SkillTag;
+
+};
+
+class ADamageDealer;
+
+USTRUCT(BlueprintType)
+struct FDamageDealerTriggerData
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float Delay;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        FGameplayTag Tag;
+};
+
+USTRUCT(BlueprintType)
+struct FSpawnDamageDealerData
+{
+    GENERATED_BODY()
+public:
+    TWeakObjectPtr<AActor> TargetActor;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TSubclassOf<ADamageDealer> Class;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        FName SocketName;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float DelayMin;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float DelayMax;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        bool bIsHoming;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "bIsHoming", EditConditionHides))
+        FRotator SpawnDirectionOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "bIsHoming", EditConditionHides))
+        float SpawnAngle;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> ActivateTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> CollisionTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> DamageSendTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FDamageDealerTriggerData> DeactivateTriggerDatas;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        bool bUseSocketLocation = 1;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float FrontDist;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float RightDist;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bUseSocketLocation", EditConditionHides))
+        float UpDist;
+};
+
+USTRUCT(BlueprintType)
+struct FChangeTargetData
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        EPayloadActorType PreTarget;
+};
+
+UENUM(BlueprintType)
+enum class EScriptedMoveLocationSourceType : uint8
+{
+    Actor, Location,
+    MAX UMETA(Hidden)
+};
+
+UENUM(BlueprintType)
+enum class EScriptedMoveRotationSourceType : uint8
+{
+    CopyActor, LookAtActor, Rotation,
+    MAX UMETA(Hidden)
+};
+
+USTRUCT(BlueprintType)
+struct FScriptedMoveData
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float Duration;
+    float ElapsedTime;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location")
+        float LocationStart;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location")
+        float LocationEnd;
+
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location")
+        EScriptedMoveLocationSourceType LocationSourceType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+        EPayloadActorType LocationActorType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && LocationActorType == EPayloadActorType::EventTargets", EditConditionHides))
+        EPayloadActorSelectType LocationActorSelectType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+        float FrontOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+        float RightOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+        float UpOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Location", EditConditionHides))
+        FVector TargetLocation;
+
+    bool LocationInit;
+    float LocationSpeed;
+    TWeakObjectPtr<AActor> LocationActor;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation")
+        float RotationStart;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation")
+        float RotationEnd;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation")
+        EScriptedMoveRotationSourceType RotationSourceType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation", EditConditionHides))
+        EPayloadActorType RotationActorType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::CopyActor", EditConditionHides))
+        FRotator AdditionalRotation;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::LookAtActor", EditConditionHides))
+        FVector LookAtOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation && RotationActorType == EPayloadActorType::EventTargets", EditConditionHides))
+        EPayloadActorSelectType RotationActorSelectType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::Rotation", EditConditionHides))
+        FRotator TargetRotation;
+
+    bool RotationInit;
+    FRotator RotationDeltaPerSecond;
+    TWeakObjectPtr<AActor> RotationActor;
+};
+
+UCLASS(BlueprintType)
+class DEMO_API UDA_GCNPayload : public UPrimaryDataAsset
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FApplyGEData>ApplyGE;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FMoveCameraData>MoveCamera;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FReserveActionData>ReserveAction;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FSpawnDamageDealerData>SpawnDamageDealer;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FChangeTargetData> ChangeTarget;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TArray<FScriptedMoveData> ScriptedMove;
 };

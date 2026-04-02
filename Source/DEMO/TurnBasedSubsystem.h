@@ -9,7 +9,10 @@
 /**
  * 
  */
-struct FPayloadContext;
+struct FMoveCameraContext;
+struct FReserveActionContext;
+struct FApplyGEContext;
+struct FScriptedMoveContext;
 struct FEffectEventContext;
 
 class ATurnBasedPhaseManager;
@@ -51,12 +54,13 @@ public:
 	FTurnBasedFieldLayoutRow FindSoftByFieldId(ETurnBasedFieldId FieldId) const;
 
 public: // from manager
-	void ApplyCameraMove(const FPayloadContext* InEffectContext);
-	void ReserveAction(const FPayloadContext* InEffectContext);
-	void ApplyGE(const FPayloadContext* InEffectContext);
+	void ApplyGE(const FApplyGEContext* InEffectContext);
+	void ApplyCameraMove(const FMoveCameraContext* InEffectContext);
+	void ReserveAction(const FReserveActionContext* InEffectContext);
+	void ChangeTarget(TArray<ATurnBasedCharacter*> PreTargets, ATurnBasedCharacter* NewTarget);
+	void EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext);
 	void SolveHitEvent(const FEffectEventContext* InEffectContext);
 	void SolvePreEvent(const FEffectEventContext* InEffectContext);
-	void ChangeTarget(ATurnBasedCharacter* InTarget);
 
 	TSet<ATurnBasedCharacter*> GetPlayerCharacters()const;
 	TSet<ATurnBasedCharacter*> GetEnemyCharacters()const;

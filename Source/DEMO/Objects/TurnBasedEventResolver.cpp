@@ -68,20 +68,74 @@ bool ATurnBasedEventResolver::CheckCondition(FEffectEventRule* Rule, ATurnBasedC
 
 void ATurnBasedEventResolver::Execute(FEffectEventRule* Rule, ATurnBasedCharacter* TagSource, const FEffectEventContext* InEffectContext)
 {
-	//UNDONE::GCN대체필요
-
-	if (Rule->TriggerContext.GCNTag == FGameplayTag::EmptyTag)return;
-
 	UAbilityComponent* asc = Cast<UAbilityComponent>(TagSource->GetAbilitySystemComponent());
-	FGameplayCueParameters gameplayCueParameters;
+	UDA_GCNPayload* da = Rule->ResultEventPayloads.Get();
+	CheckTrue_Print(!da, "payload cast failed!!");
 
-	FPayloadContext* payload = Rule->TriggerContext.Duplicate();
-	payload->EventCauserActor = InEffectContext->EventCauserActor;
-	payload->EventTargetActor = InEffectContext->EventTargetActor;
-	payload->RuleSourceActor = TagSource;
+	for (int32 i = 0; i < da->ApplyGE.Num(); i++)
+	{
+		FGameplayCueParameters gameplayCueParameters;
+		FApplyGEContext* context = new FApplyGEContext();
+		context->EventCauserActor = InEffectContext->EventCauserActor;
+		context->EventTargetActors.Add(InEffectContext->EventTargetActor);
+		context->RuleSourceActor = TagSource;
+		context->Data = da->ApplyGE[i];
 
-	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(payload);
-	asc->ExecuteGameplayCue(payload->GCNTag, gameplayCueParameters);
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ApplyGE"), gameplayCueParameters);
+	}
+
+	for (int32 i = 0; i < da->MoveCamera.Num(); i++)
+	{
+		FGameplayCueParameters gameplayCueParameters;
+		FMoveCameraContext* context = new FMoveCameraContext();
+		context->EventCauserActor = InEffectContext->EventCauserActor;
+		context->EventTargetActors.Add(InEffectContext->EventTargetActor);
+		context->RuleSourceActor = TagSource;
+		context->Data = da->MoveCamera[i];
+
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.TurnBasedCamera"), gameplayCueParameters);
+	}
+
+	for (int32 i = 0; i < da->ReserveAction.Num(); i++)
+	{
+		FGameplayCueParameters gameplayCueParameters;
+		FReserveActionContext* context = new FReserveActionContext();
+		context->EventCauserActor = InEffectContext->EventCauserActor;
+		context->EventTargetActors.Add(InEffectContext->EventTargetActor);
+		context->RuleSourceActor = TagSource;
+		context->Data = da->ReserveAction[i];
+
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ReserveAction"), gameplayCueParameters);
+	}
+
+	for (int32 i = 0; i < da->SpawnDamageDealer.Num(); i++)
+	{
+		FGameplayCueParameters gameplayCueParameters;
+		FSpawnDamageDealerContext* context = new FSpawnDamageDealerContext();
+		context->EventCauserActor = InEffectContext->EventCauserActor;
+		context->EventTargetActors.Add(InEffectContext->EventTargetActor);
+		context->RuleSourceActor = TagSource;
+		context->Data = da->SpawnDamageDealer[i];
+
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnDamageDealer"), gameplayCueParameters);
+	}
+
+	for (int32 i = 0; i < da->ChangeTarget.Num(); i++)
+	{
+		FGameplayCueParameters gameplayCueParameters;
+		FChangeTargetContext* context = new FChangeTargetContext();
+		context->EventCauserActor = InEffectContext->EventCauserActor;
+		context->EventTargetActors.Add(InEffectContext->EventTargetActor);
+		context->RuleSourceActor = TagSource;
+		context->Data = da->ChangeTarget[i];
+
+		gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+		asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ChangeTarget"), gameplayCueParameters);
+	}
 }
 
 void ATurnBasedEventResolver::SolveEvent(const FEffectEventContext* InEffectContext, ATurnBasedCharacter* InCharacter, const TMap<FGameplayTag, TArray<FEffectEventRule*>>& RuleMap)

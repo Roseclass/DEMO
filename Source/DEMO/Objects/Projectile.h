@@ -34,6 +34,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence", meta = (ClampMin = 0.00, EditCondition = "bUseDeactivateCameraMove", EditConditionHides))
 		float CollsionEventDelay;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence")
+		float HomingDelayMin;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Datas|Sequence")
+		float HomingDelayMax;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 		UProjectileMovementComponent* ProjectileMovementComponent;
 
@@ -49,12 +55,13 @@ protected:
 	UFUNCTION()void OnComponentBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 	UFUNCTION()void OnComponentEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 	void FindCollision();
+	void InitProjectile();
 
 	virtual bool TryDestroy() override;
 
 	FORCEINLINE const TArray<UShapeComponent*>& GetCollisionComponents()const { return CollisionComponents; }
 public:
-	virtual void Init(const FSpawnDamageDealerContext* InData)override;
+	virtual void Init(const FSpawnDamageDealerData* InData)override;
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)AActor* GetTarget();
 };

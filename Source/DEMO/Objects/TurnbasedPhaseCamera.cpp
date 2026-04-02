@@ -98,7 +98,7 @@ void ATurnbasedPhaseCamera::InterpToGoal(float DeltaTime)
 
 void ATurnbasedPhaseCamera::HandleShotType()
 {
-	FCameraPreset* preset = CameraPresetDatas.FindOrAdd(CurrentDA->ShotType);
+	FCameraPreset* preset = CameraPresetDatas.FindOrAdd(CurrentData.ShotType);
 	FVector newLoc = preset->BaseOffset + ShotOrigin->GetActorLocation();
 	float armlength = preset->BaseArmLength;
 
@@ -119,31 +119,31 @@ void ATurnbasedPhaseCamera::HandleTargetCount()
 
 void ATurnbasedPhaseCamera::HandleSkillType()
 {
-	if (CurrentDA->LookAtType == ECameraLookAtType::Target_Primary)
+	if (CurrentData.LookAtType == ECameraLookAtType::Target_Primary)
 	{
-		//LookAtLocation = CurrentDA->TargetActors[0]->GetActorLocation();
+		//LookAtLocation = CurrentData.TargetActors[0]->GetActorLocation();
 	}
-	else if (CurrentDA->LookAtType == ECameraLookAtType::Target_RandomOnce)
+	else if (CurrentData.LookAtType == ECameraLookAtType::Target_RandomOnce)
 	{
-		//LookAtLocation = CurrentDA->TargetActors
-		//	[UKismetMathLibrary::RandomIntegerInRange(0, CurrentDA->TargetActors.Num() - 1)]
+		//LookAtLocation = CurrentData.TargetActors
+		//	[UKismetMathLibrary::RandomIntegerInRange(0, CurrentData.TargetActors.Num() - 1)]
 		//->GetActorLocation();
 	}
-	else if (CurrentDA->LookAtType == ECameraLookAtType::Target_Center)
+	else if (CurrentData.LookAtType == ECameraLookAtType::Target_Center)
 	{
-		//for(auto i : CurrentDA->TargetActors)
+		//for(auto i : CurrentData.TargetActors)
 		//	LookAtLocation += i->GetActorLocation();
-		//LookAtLocation /= CurrentDA->TargetActors.Num();
+		//LookAtLocation /= CurrentData.TargetActors.Num();
 	}
-	else if (CurrentDA->LookAtType == ECameraLookAtType::ImpactPoint)
+	else if (CurrentData.LookAtType == ECameraLookAtType::ImpactPoint)
 	{
-		//LookAtLocation = CurrentDA->GetHitResult()->ImpactPoint;
+		//LookAtLocation = CurrentData.GetHitResult()->ImpactPoint;
 	}
-	else if (CurrentDA->LookAtType == ECameraLookAtType::Origin_Forward)
+	else if (CurrentData.LookAtType == ECameraLookAtType::Origin_Forward)
 	{
 		//LookAtLocation =
-		//	CurrentDA->ShotOriginActor->GetActorLocation() +
-		//	CurrentDA->ShotOriginActor->GetActorForwardVector();
+		//	CurrentData.ShotOriginActor->GetActorLocation() +
+		//	CurrentData.ShotOriginActor->GetActorForwardVector();
 	}
 }
 
@@ -181,18 +181,16 @@ bool ATurnbasedPhaseCamera::IsRotating()const
 	return bRotating || bReturning;
 }
 
-void ATurnbasedPhaseCamera::ApplyCameraMove(const FPayloadContext* InEffectContext)
+void ATurnbasedPhaseCamera::ApplyCameraMove(const FMoveCameraContext* InEffectContext)
 {
-	CurrentDA = Cast<UDA_MoveCamera>(InEffectContext->Payload);
-	CheckTrue_Print(!CurrentDA, "CurrentDA cast failed!!");
+	CurrentData = InEffectContext->Data;
 
 	{
-		switch (CurrentDA->ShotOrigin)
+		switch (CurrentData.ShotOrigin)
 		{
 		case EPayloadActorType::RuleSource:ShotOrigin = InEffectContext->RuleSourceActor.Get(); break;
 		case EPayloadActorType::EventCauser:ShotOrigin = InEffectContext->EventCauserActor.Get(); break;
-		case EPayloadActorType::EventTarget:ShotOrigin = InEffectContext->EventTargetActor.Get(); break;
-		case EPayloadActorType::EventTargets:/*TODO::*/ break;
+		case EPayloadActorType::EventTargets:ShotOrigin = InEffectContext->EventTargetActors[0].Get(); break;
 		default:break;
 		}
 	}

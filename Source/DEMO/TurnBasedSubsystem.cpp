@@ -158,19 +158,29 @@ FTurnBasedFieldLayoutRow UTurnBasedSubsystem::FindSoftByFieldId(ETurnBasedFieldI
 	return *LevelDatas[FieldId];
 }
 
-void UTurnBasedSubsystem::ApplyCameraMove(const FPayloadContext* InEffectContext)
+void UTurnBasedSubsystem::ApplyGE(const FApplyGEContext* InEffectContext)
+{
+	Manager->ApplyGE(InEffectContext);
+}
+
+void UTurnBasedSubsystem::ApplyCameraMove(const FMoveCameraContext* InEffectContext)
 {
 	Manager->ApplyCameraMove(InEffectContext);
 }
 
-void UTurnBasedSubsystem::ReserveAction(const FPayloadContext* InEffectContext)
+void UTurnBasedSubsystem::ReserveAction(const FReserveActionContext* InEffectContext)
 {
 	Manager->ReserveAction(InEffectContext);
 }
 
-void UTurnBasedSubsystem::ApplyGE(const FPayloadContext* InEffectContext)
+void UTurnBasedSubsystem::ChangeTarget(TArray<ATurnBasedCharacter*> PreTargets, ATurnBasedCharacter* NewTarget)
 {
-	Manager->ApplyGE(InEffectContext);
+	Manager->ChangeTarget(PreTargets, NewTarget);
+}
+
+void UTurnBasedSubsystem::EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext)
+{
+	Manager->EnqueueScriptedMove(InEffectContext);
 }
 
 void UTurnBasedSubsystem::SolveHitEvent(const FEffectEventContext* InEffectContext)
@@ -181,11 +191,6 @@ void UTurnBasedSubsystem::SolveHitEvent(const FEffectEventContext* InEffectConte
 void UTurnBasedSubsystem::SolvePreEvent(const FEffectEventContext* InEffectContext)
 {
 	EventResolver->SolveEvent(InEffectContext, EEffectEventPhase::Pre);
-}
-
-void UTurnBasedSubsystem::ChangeTarget(ATurnBasedCharacter* InTarget)
-{
-	Manager->ChangeTarget(InTarget);
 }
 
 TSet<ATurnBasedCharacter*> UTurnBasedSubsystem::GetPlayerCharacters()const

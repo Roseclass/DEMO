@@ -14,7 +14,7 @@ bool UGCN_ReserveAction::OnExecute_Implementation(AActor* MyTarget, const FGamep
 {
 	// TODO:: 여기서 예약하지 말고 옮기기
 
-	const FPayloadContext* effectContext = static_cast<const FPayloadContext*>(Parameters.EffectContext.Get());
+	const FReserveActionContext* effectContext = static_cast<const FReserveActionContext*>(Parameters.EffectContext.Get());
 	if (!effectContext)return false;
 
 	UTurnBasedSubsystem* TBS = GetWorld()->GetGameInstance()->GetSubsystem<UTurnBasedSubsystem>();

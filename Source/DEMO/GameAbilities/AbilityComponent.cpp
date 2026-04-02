@@ -17,6 +17,8 @@ UAbilityComponent::UAbilityComponent()
 void UAbilityComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	OnAnyGameplayEffectRemovedDelegate().AddUFunction(this,"OnAnyGameplayEffectRemoved");
 }
 
 FActiveGameplayEffectHandle UAbilityComponent::ApplyGameplayEffectSpecToSelf(const FGameplayEffectSpec& GameplayEffect, FPredictionKey PredictionKey)
@@ -43,8 +45,48 @@ FActiveGameplayEffectHandle UAbilityComponent::ApplyGameplayEffectSpecToSelf(con
 			CCHandles.Add(activeEffectHandle);
 		if (assetTags.HasTag(FGameplayTag::RequestGameplayTag("Effect.Damage.DoT")))
 			DoTDamageHandles.Add(activeEffectHandle);		
+
+		if (assetTags.HasTag(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnFX")))
+		{
+			FGameplayTagContainer tags = assetTags.Filter(FGameplayTagContainer(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnFX")));
+			if (1 < tags.Num())
+			{
+				//ge에 태그 잘못 넣음
+			}
+
+			FGameplayTag tag = tags.GetByIndex(0);
+			if (GetActiveGameplayEffect(DurationFXHandles.FindOrAdd(tag)) != activeEffect)
+				DurationFXHandles[tag] = activeEffectHandle;
+
+			FGameplayCueParameters params;
+			params.EffectContext = activeEffect->Spec.GetEffectContext();
+			params.GameplayEffectLevel = GetCurrentStackCount(activeEffectHandle);
+			params.OriginalTag = tag;
+			ExecuteGameplayCue(tag, params);
+		}
 	}
 	return activeEffectHandle;
+}
+
+void UAbilityComponent::OnAnyGameplayEffectRemoved(const FActiveGameplayEffect& RemovedGE)
+{
+	FGameplayTagContainer assetTags;
+	RemovedGE.Spec.GetAllAssetTags(assetTags);
+
+	if (assetTags.HasTag(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnFX")))
+	{
+		FGameplayTagContainer tags = assetTags.Filter(FGameplayTagContainer(FGameplayTag::RequestGameplayTag("GameplayCue.SpawnFX")));
+		if (1 < tags.Num())
+		{
+			//ge에 태그 잘못 넣음
+		}
+		FGameplayTag tag = tags.GetByIndex(0);
+		FGameplayCueParameters params;
+		params.EffectContext = RemovedGE.Spec.GetEffectContext();
+		params.NormalizedMagnitude = -1;
+		params.OriginalTag = tag;
+		ExecuteGameplayCue(tag, params);
+	}
 }
 
 void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
@@ -67,7 +109,7 @@ void UAbilityComponent::InitGA(const TArray<FAbilitySpecInfo>& NewGAs)
 		if (!spec)continue;		
 
 		if (const UGA_Skill* skill = Cast<UGA_Skill>(spec->Ability))
-			SkillGAHandles.FindOrAdd(skill->GetSkillTag()) = handle;
+			SkillGAHandles.FindOrAdd(skill->GetSkillTag(), handle);
 
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_Dead))StateGAHandles.FindOrAdd(StateTag_Dead) = handle;
 		if (spec->Ability->AbilityTags.HasTagExact(StateTag_Hit))StateGAHandles.FindOrAdd(StateTag_Hit) = handle;
@@ -249,7 +291,8 @@ void UAbilityComponent::GetSkillCooldownTimeRemainingAndDuration(FGameplayTag In
 
 FGameplayAbilitySpec* UAbilityComponent::FindAbilitySpecFromSkillTag(FGameplayTag InSkillTag)
 {
-	return SkillGAHandles.Contains(InSkillTag) ? FindAbilitySpecFromHandle(SkillGAHandles[InSkillTag]) : nullptr;
+	if (!SkillGAHandles.Contains(InSkillTag))return nullptr;
+	return FindAbilitySpecFromHandle(SkillGAHandles[InSkillTag]);
 }
 
 void UAbilityComponent::HandleDoTDamage(FActiveGameplayEffectHandle InHandle, OUT AActor** EventCauserActor, OUT AActor** EventTargetActor)
