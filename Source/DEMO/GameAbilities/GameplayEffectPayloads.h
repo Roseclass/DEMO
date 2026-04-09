@@ -26,7 +26,7 @@ enum class EPayloadActorType : uint8
 };
 
 UENUM(BlueprintType)
-enum class EPayloadActorSelectType  : uint8
+enum class EPayloadTargetSelectType  : uint8
 {
     Random,
     First,
@@ -137,105 +137,6 @@ public:
         int32 StackCount = 1;
 };
 
-////
-//// Move Camera
-////
-
-UENUM(BlueprintType)
-enum class ECameraShotType : uint8
-{
-    // 시전자 오른쪽 어깨 뒤편
-    OTS_Right,          
-    // 시전자 왼쪽 어깨 뒤편
-    OTS_Left,           
-    // 1:1 대결 구도
-    Duel_TwoShot,  
-    // 인물 중심
-    Mid_Front3Q,     
-    // 확대
-    Close_Up,       
-    // 히트 순간 확대
-    Impact_Close,       
-    // 전장/다수 타겟/턴 시작 와이드
-    Wide_Establish,     
-    // 3~4명 프레이밍
-    Group_3Q,           
-    // 전술/배치 강조(위에서 내려다봄)
-    TopDown_Tactical,   
-    // 피니시/킬샷(낮게, 위로 올려다봄)
-    LowAngle_Finisher,  
-    // 횡이동/라인액션(측면 구도)
-    Side_Profile,       
-    // 뒤에서 크게 잡아 진입/돌진
-    Rear_Wide,          
-    MAX UMETA(Hidden)
-};
-
-UENUM(BlueprintType)
-enum class ECameraLookAtType : uint8    // 어디방향 쳐다볼거임?
-{
-    // TargetActors[0]
-    Target_Primary,     
-    // Shot 시작 시 1회 랜덤
-    Target_RandomOnce,  
-    // TargetActors 중심점
-    Target_Center,      
-    // HitResult.ImpactPoint
-    ImpactPoint,        
-    // ShotOriginActor 정면
-    Origin_Forward,     
-    MAX UMETA(Hidden)
-};
-
-UENUM(BlueprintType)
-enum class ECameraEventType : uint8 // 무슨 이벤트임 ?
-{
-    TurnStart,
-    ActionStart,
-    HitConfirmed,
-    Explosion,
-    Interrupt,
-    Death,
-    ActionEnd,
-    MAX UMETA(Hidden)
-};
-
-UENUM(BlueprintType)
-enum class ECameraSkillType : uint8    // 어떤 타입의 이벤트임?
-{
-    Basic,
-    Single,
-    MultiHit,
-    AoE,
-    Projectile,
-    Dash,
-    Protect,
-    Counter,
-    Buff,
-    Debuff,
-    MAX UMETA(Hidden)
-};
-
-UCLASS(BlueprintType)
-class DEMO_API UDA_MoveCamera : public UPrimaryDataAsset
-{
-    GENERATED_BODY()
-public:
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        EPayloadActorType ShotOrigin;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraShotType ShotType;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraLookAtType LookAtType;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraEventType EventType;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraSkillType SkillType;
-};
 
 USTRUCT(BlueprintType)
 struct FApplyGEData
@@ -265,27 +166,116 @@ public:
 
 };
 
+////
+//// Move Camera
+////
+
+UENUM(BlueprintType)
+enum class ECameraShotType : uint8
+{
+    ActorToActor,
+    ActorToLoc,
+    LocToActor,
+    LocToLoc,
+    MAX UMETA(Hidden)
+};
+
+UENUM(BlueprintType)
+enum class ECameraLookAtType : uint8    // 어디방향 쳐다볼거임?
+{
+    OriginToDest,
+    DestToOrigin,
+    MAX UMETA(Hidden)
+};
+
+class UCurveFloat;
+class UCameraShakeBase;
+
 USTRUCT(BlueprintType)
 struct FMoveCameraData
 {
     GENERATED_BODY()
 public:
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        EPayloadActorType ShotOrigin;
-
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
         ECameraShotType ShotType;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
         ECameraLookAtType LookAtType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraEventType EventType;
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::ActorToActor || ShotType == ECameraShotType::ActorToLoc", EditConditionHides))
+        EPayloadActorType OriginActor;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "OriginActor == EPayloadActorType::EventTargets", EditConditionHides))
+        EPayloadTargetSelectType OriginActorSelectType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::ActorToActor || ShotType == ECameraShotType::ActorToLoc", EditConditionHides))
+        bool bAttach;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "bAttach", EditConditionHides))
+        FName AttachSocketName;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "bAttach", EditConditionHides))
+        FVector AttachOffset;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "!bAttach", EditConditionHides))
+        FVector OriginActorOffset; // x means forward offset, y means right offset, z means up offset
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::LocToActor || ShotType == ECameraShotType::LocToLoc", EditConditionHides))
+        FVector OriginLoc;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::ActorToActor || ShotType == ECameraShotType::LocToActor", EditConditionHides))
+        EPayloadActorType DestActor;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "DestActor == EPayloadActorType::EventTargets", EditConditionHides))
+        EPayloadTargetSelectType DestActorSelectType;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::ActorToActor || ShotType == ECameraShotType::LocToActor", EditConditionHides))
+        FVector DestActorOffset; // x means forward offset, y means right offset, z means up offset
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, meta = (EditCondition = "ShotType == ECameraShotType::ActorToLoc || ShotType == ECameraShotType::LocToLoc", EditConditionHides))
+        FVector DestLoc;
 
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
-        ECameraSkillType SkillType;
+        FRuntimeFloatCurve SpringArmCurve;
 
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float LBlendStart;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float LBlendEnd;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float RBlendStart;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float RBlendEnd;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        float CameraLagSpeed = 10;
+
+    float ElapsedTime = 0;
 };
+
+/*
+* 
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        UCurveFloat* CloseUpCurve;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        TSubclassOf<UCameraShakeBase> CameraShake;
+
+* 공통
+* 스킬 선택 정면샷, 타겟 선택 와이드뷰, 인포 정리 항공뷰
+* 
+* revenant
+* attack execution + cone randomize angle + fadeout
+* cast impact  + cone randomize angle + fadeout
+* castmassive(미완)
+* castult followcam->impact + fadeout
+* 
+* 일단은 카메라를 내가 원하는 위치에 원하는 방향을 바라보게 보내는것부터 먼저하자.
+* 
+*/
 
 USTRUCT(BlueprintType)
 struct FReserveActionData
@@ -405,6 +395,9 @@ struct FScriptedMoveData
     GENERATED_BODY()
 public:
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
+        bool bReturn;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
         float Duration;
     float ElapsedTime;
 
@@ -414,25 +407,25 @@ public:
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location")
         float LocationEnd;
 
-	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location")
+	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "!bReturn", EditConditionHides))
         EScriptedMoveLocationSourceType LocationSourceType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && !bReturn", EditConditionHides))
         EPayloadActorType LocationActorType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && LocationActorType == EPayloadActorType::EventTargets", EditConditionHides))
-        EPayloadActorSelectType LocationActorSelectType;
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && LocationActorType == EPayloadActorType::EventTargets && !bReturn", EditConditionHides))
+        EPayloadTargetSelectType LocationActorSelectType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && !bReturn", EditConditionHides))
         float FrontOffset;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && !bReturn", EditConditionHides))
         float RightOffset;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Actor && !bReturn", EditConditionHides))
         float UpOffset;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Location", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Location", meta = (EditCondition = "LocationSourceType == EScriptedMoveLocationSourceType::Location && !bReturn", EditConditionHides))
         FVector TargetLocation;
 
     bool LocationInit;
@@ -445,27 +438,44 @@ public:
     UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation")
         float RotationEnd;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation")
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "!bReturn", EditConditionHides))
         EScriptedMoveRotationSourceType RotationSourceType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation && !bReturn", EditConditionHides))
         EPayloadActorType RotationActorType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::CopyActor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::CopyActor && !bReturn", EditConditionHides))
         FRotator AdditionalRotation;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::LookAtActor", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::LookAtActor && !bReturn", EditConditionHides))
         FVector LookAtOffset;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation && RotationActorType == EPayloadActorType::EventTargets", EditConditionHides))
-        EPayloadActorSelectType RotationActorSelectType;
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType != EScriptedMoveRotationSourceType::Rotation && RotationActorType == EPayloadActorType::EventTargets && !bReturn", EditConditionHides))
+        EPayloadTargetSelectType RotationActorSelectType;
 
-    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::Rotation", EditConditionHides))
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Rotation", meta = (EditCondition = "RotationSourceType == EScriptedMoveRotationSourceType::Rotation && !bReturn", EditConditionHides))
         FRotator TargetRotation;
 
     bool RotationInit;
     FRotator RotationDeltaPerSecond;
     TWeakObjectPtr<AActor> RotationActor;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Jump")
+        bool bUseJump;
+
+    UPROPERTY(BlueprintReadOnly, EditDefaultsOnly, Category = "Jump", meta = (EditCondition = "bUseJump", EditConditionHides))
+        float JumpStart;
+
+    bool JumpInit;
+public:
+    void SetReturn(const FTransform& OriginTransform)
+    {
+        if (!bReturn)return;
+        LocationSourceType = EScriptedMoveLocationSourceType::Location;
+        TargetLocation = OriginTransform.GetTranslation();
+        RotationSourceType = EScriptedMoveRotationSourceType::Rotation;
+        TargetRotation = OriginTransform.GetRotation().Rotator();
+    }
 };
 
 UCLASS(BlueprintType)

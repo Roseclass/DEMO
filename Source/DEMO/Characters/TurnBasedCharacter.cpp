@@ -2,6 +2,7 @@
 #include "Global.h"
 
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 #include "SaveLoadSubsystem.h"
 
@@ -18,6 +19,8 @@ ATurnBasedCharacter::ATurnBasedCharacter()
 	CHelpers::CreateActorComponent<UTBActiveFXComponent>(this, &ActiveFX, "ActiveFX");
 
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+
+	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 }
 
 void ATurnBasedCharacter::BeginPlay()
@@ -95,12 +98,16 @@ void ATurnBasedCharacter::InitGA(UPrimaryDataAsset* DA)
 void ATurnBasedCharacter::ProcessScriptedMove(float DeltaTime)
 {
 	if (PendingScriptedMoves.IsEmpty())return;
+	if (!CurrentScriptedMove)
+		CurrentScriptedMove = &PendingScriptedMoves[0];
 
-	FScriptedMoveData& data = PendingScriptedMoves[0];
+	FScriptedMoveData& data = *CurrentScriptedMove;
 
 	FVector currentLoc = GetActorLocation();
 	FVector goalLoc = data.TargetLocation;
 	FVector direction = (goalLoc - currentLoc).GetSafeNormal();
+	direction.Z = 0;
+	direction = direction.GetSafeNormal();
 
 	if (data.ElapsedTime <= data.LocationEnd && data.LocationStart <= data.ElapsedTime + DeltaTime)
 	{
@@ -108,15 +115,13 @@ void ATurnBasedCharacter::ProcessScriptedMove(float DeltaTime)
 		{
 			data.LocationInit = 1;
 			if (!FMath::IsNearlyEqual(data.LocationStart, data.LocationEnd))
-				data.LocationSpeed = UKismetMathLibrary::Vector_Distance(currentLoc, goalLoc) / (data.LocationEnd - data.LocationStart);
+				data.LocationSpeed = UKismetMathLibrary::Vector_Distance2D(currentLoc, goalLoc) / (data.LocationEnd - data.LocationStart);
 		}
 		if(FMath::IsNearlyEqual(data.LocationStart, data.LocationEnd))
 			SetActorLocation(goalLoc);
 		else
 		{
 			currentLoc += direction * data.LocationSpeed * (FMath::Min(data.LocationEnd, data.ElapsedTime + DeltaTime) - FMath::Max(data.LocationStart, data.ElapsedTime));
-			if (data.LocationEnd <= data.ElapsedTime + DeltaTime)
-				currentLoc = goalLoc;
 			SetActorLocation(currentLoc);
 		}
 	}
@@ -147,9 +152,25 @@ void ATurnBasedCharacter::ProcessScriptedMove(float DeltaTime)
 			SetActorRotation(currentRot);
 		}
 	}
+
+	if (data.ElapsedTime <= data.JumpStart && data.JumpStart <= data.ElapsedTime + DeltaTime && data.bUseJump && !data.JumpInit)
+	{
+		float zVelocity = FMath::Max(490.f, 490.f * (data.Duration - data.JumpStart));
+		GetCharacterMovement()->JumpZVelocity = zVelocity;
+
+		this->Jump();
+		data.JumpInit = 1;
+	}
+
 	data.ElapsedTime += DeltaTime;
-	if(data.Duration <= data.ElapsedTime)
+	float tolerance = GetCapsuleComponent()->GetScaledCapsuleRadius();	
+	float dist = UKismetMathLibrary::Vector_Distance2D(GetActorLocation(), goalLoc);
+	if (dist <= tolerance)
+	{
+		CurrentScriptedMove = nullptr;
 		PendingScriptedMoves.RemoveAt(0);
+	}
+
 }
 
 void ATurnBasedCharacter::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
@@ -164,10 +185,19 @@ FGameplayTag ATurnBasedCharacter::GetDataTag() const
 	return RuntimeData.DataTag;
 }
 
-void ATurnBasedCharacter::EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext)
+void ATurnBasedCharacter::EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext, const FTransform& OriginTransform)
 {
 	FScriptedMoveData data;
 	data = InEffectContext->Data;
+
+	if (data.bReturn)
+	{
+		data.LocationSourceType = EScriptedMoveLocationSourceType::Location;
+		data.TargetLocation = OriginTransform.GetTranslation();
+		data.RotationSourceType = EScriptedMoveRotationSourceType::Rotation;
+		data.TargetRotation = OriginTransform.GetRotation().Rotator();
+	}
+
 	if(data.LocationSourceType == EScriptedMoveLocationSourceType::Actor)
 	{
 		if (data.LocationActorType == EPayloadActorType::RuleSource)
@@ -176,13 +206,13 @@ void ATurnBasedCharacter::EnqueueScriptedMove(const FScriptedMoveContext* InEffe
 			data.LocationActor = InEffectContext->EventCauserActor;
 		else if (data.LocationActorType == EPayloadActorType::EventTargets)
 		{
-			if (data.LocationActorSelectType == EPayloadActorSelectType::Random)
+			if (data.LocationActorSelectType == EPayloadTargetSelectType::Random)
 				data.LocationActor = InEffectContext->EventTargetActors[UKismetMathLibrary::RandomIntegerInRange(0, InEffectContext->EventTargetActors.Num() - 1)];
-			else if (data.LocationActorSelectType == EPayloadActorSelectType::First)
+			else if (data.LocationActorSelectType == EPayloadTargetSelectType::First)
 				data.LocationActor = InEffectContext->EventTargetActors[0];
-			else if (data.LocationActorSelectType == EPayloadActorSelectType::Center)
+			else if (data.LocationActorSelectType == EPayloadTargetSelectType::Center)
 				data.LocationActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() / 2];
-			else if (data.LocationActorSelectType == EPayloadActorSelectType::Last)
+			else if (data.LocationActorSelectType == EPayloadTargetSelectType::Last)
 				data.LocationActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() - 1];
 		}
 
@@ -200,13 +230,13 @@ void ATurnBasedCharacter::EnqueueScriptedMove(const FScriptedMoveContext* InEffe
 			data.RotationActor = InEffectContext->EventCauserActor;
 		else if (data.RotationActorType == EPayloadActorType::EventTargets)
 		{
-			if (data.RotationActorSelectType == EPayloadActorSelectType::Random)
+			if (data.RotationActorSelectType == EPayloadTargetSelectType::Random)
 				data.RotationActor = InEffectContext->EventTargetActors[UKismetMathLibrary::RandomIntegerInRange(0, InEffectContext->EventTargetActors.Num() - 1)];
-			else if (data.RotationActorSelectType == EPayloadActorSelectType::First)
+			else if (data.RotationActorSelectType == EPayloadTargetSelectType::First)
 				data.RotationActor = InEffectContext->EventTargetActors[0];
-			else if (data.RotationActorSelectType == EPayloadActorSelectType::Center)
+			else if (data.RotationActorSelectType == EPayloadTargetSelectType::Center)
 				data.RotationActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() / 2];
-			else if (data.RotationActorSelectType == EPayloadActorSelectType::Last)
+			else if (data.RotationActorSelectType == EPayloadTargetSelectType::Last)
 				data.RotationActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() - 1];
 		}
 

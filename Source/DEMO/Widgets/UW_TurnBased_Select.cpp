@@ -253,12 +253,12 @@ void UUW_TurnBased_Select::SetWidgetDatas(ATurnBasedCharacter* NewTurnCharacter)
 	ATurnBasedEnemy* enemy = Cast<ATurnBasedEnemy>(TurnCharacter);
 	if (enemy)
 	{
-		enemy->LinkSelectWidget(nullptr);
-		enemy->OnLeft.Unbind();
-		enemy->OnRight.Unbind();
-		enemy->OnUp.Unbind();
-		enemy->OnDown.Unbind();
-		enemy->OnConfirm.Unbind();
+		//enemy->LinkSelectWidget(nullptr);
+		//enemy->OnLeft.Unbind();
+		//enemy->OnRight.Unbind();
+		//enemy->OnUp.Unbind();
+		//enemy->OnDown.Unbind();
+		//enemy->OnConfirm.Unbind();
 	}
 
 	TurnCharacter = NewTurnCharacter;
@@ -291,12 +291,12 @@ void UUW_TurnBased_Select::SetWidgetDatas(ATurnBasedCharacter* NewTurnCharacter)
 	enemy = Cast<ATurnBasedEnemy>(TurnCharacter);
 	if (enemy)
 	{
-		enemy->LinkSelectWidget(this);
-		enemy->OnLeft.BindUFunction(this, "Left");
-		enemy->OnRight.BindUFunction(this, "Right");
-		enemy->OnUp.BindUFunction(this, "Up");
-		enemy->OnDown.BindUFunction(this, "Down");
-		enemy->OnConfirm.BindUFunction(this, "Confirm");
+		//enemy->LinkSelectWidget(this);
+		//enemy->OnLeft.BindUFunction(this, "Left");
+		//enemy->OnRight.BindUFunction(this, "Right");
+		//enemy->OnUp.BindUFunction(this, "Up");
+		//enemy->OnDown.BindUFunction(this, "Down");
+		//enemy->OnConfirm.BindUFunction(this, "Confirm");
 	}
 }
 

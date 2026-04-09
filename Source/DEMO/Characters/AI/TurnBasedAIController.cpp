@@ -71,3 +71,8 @@ void ATurnBasedAIController::RestartLogic()
 {
 	GetBrainComponent()->RestartLogic();
 }
+
+FName ATurnBasedAIController::GetDataKeyName()const
+{
+	return FName("Data");
+}

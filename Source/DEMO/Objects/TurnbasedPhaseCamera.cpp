@@ -15,136 +15,167 @@ ATurnbasedPhaseCamera::ATurnbasedPhaseCamera()
 	CHelpers::CreateComponent<USpringArmComponent>(this, &CameraBoom, "CameraBoom");
 	CHelpers::CreateComponent<UCameraComponent>(this, &FollowCamera, "FollowCamera", CameraBoom);
 	CameraBoom->bEnableCameraLag = 1;
-
-	CHelpers::GetAsset<UDataTable>(&CameraPresetDT, "DataTable'/Game/Datas/DT_CameraPreset.DT_CameraPreset'");
+	CameraBoom->bDoCollisionTest = 0;
 }
 
 void ATurnbasedPhaseCamera::BeginPlay()
 {
 	Super::BeginPlay();	
-
-	TArray<FCameraPreset*> arr;
-	CameraPresetDT->GetAllRows("", arr); 
-	for (auto data : arr)
-		CameraPresetDatas.FindOrAdd(data->ShotType) = data;
 }
 
 void ATurnbasedPhaseCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (bRotating)
-	{
-		InterpToGoal(DeltaTime);
-	}
-	else if (bReturning)
-	{
-		ReturnInterp(DeltaTime);
-	}
+	if (IsRotating())
+		BlendToTarget(DeltaTime);
 }
 
-void ATurnbasedPhaseCamera::ReturnInterp(float DeltaTime)
+void ATurnbasedPhaseCamera::BlendToTarget(float DeltaTime)
 {
-	//FTransform current = GetActorTransform();
-	//FTransform goal = CurrentMoveEffect.CameraReturnType == ECameraReturnType::Prev ? ReturnTransform : InitialTransform;
-	//current = UKismetMathLibrary::TInterpTo(
-	//	current,
-	//	goal,
-	//	DeltaTime,
-	//	4.6 / BlendTime);
-	//SetActorTransform(current);
-	//if (current.Equals(goal, 1))
-	//	bReturning = 0;
-}
+	FVector loc = GetActorLocation();
+	FQuat4d rot;
 
-void ATurnbasedPhaseCamera::InterpToGoal(float DeltaTime)
-{
-	if (BlendTime < 1e-9)
+	// set location
+	if (CurrentData.ElapsedTime <= CurrentData.LBlendEnd && CurrentData.LBlendStart <= CurrentData.ElapsedTime + DeltaTime && bLocating)
 	{
-		SetActorLocation(GoalLocation);
-		ElapsedTime = 0;
+		if (!GetAttachParentActor())
+		{
+			if (CurrentData.bAttach)
+			{
+				AttachToActor(OriginActor, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+				SetActorRelativeLocation(CurrentData.AttachOffset);
+			}
+			else if (FMath::IsNearlyEqual(CurrentData.LBlendEnd, CurrentData.LBlendStart))
+				loc = GetBlendOrigin();
+			else loc = UKismetMathLibrary::VInterpTo(loc, GetBlendOrigin(), DeltaTime, 4.6 / (CurrentData.LBlendEnd - CurrentData.LBlendStart));
+
+			if (!GetAttachParentActor())
+				SetActorLocation(loc);
+		}
+	}
+
+	// set rotaton
+	if (CurrentData.ElapsedTime <= CurrentData.RBlendEnd && CurrentData.RBlendStart <= CurrentData.ElapsedTime + DeltaTime && bRotating)
+	{
+		if (CurrentData.LookAtType == ECameraLookAtType::OriginToDest)
+			rot = FQuat4d(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), GetBlendDest()));
+		else
+			rot = FQuat4d(UKismetMathLibrary::FindLookAtRotation(GetBlendDest(), GetActorLocation()));
+		SetActorRotation(rot);
+	}
+
+	// set armlength
+	{
+		CameraBoom->TargetArmLength = GetSpringArmLength(); 
+	}
+
+
+	if ((!GetAttachParentActor() && UKismetMathLibrary::Vector_Distance(GetActorLocation(), GetBlendOrigin()) < 10) || CurrentData.LBlendEnd <= CurrentData.ElapsedTime)
+	{
+		bLocating = 0;
+		if(GetAttachParentActor())
+			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	}
+
+	if(CurrentData.RBlendEnd <= CurrentData.ElapsedTime)
 		bRotating = 0;
-		return;
-	}
 
-	ElapsedTime += DeltaTime;
-
-	//if (LookAtTargetActor.IsValid())
-	//{
-	//	SetActorRotation(
-	//		FQuat4d(
-	//			UKismetMathLibrary::FindLookAtRotation
-	//			(GetActorLocation(), LookAtTargetActor->GetActorLocation() + CurrentMoveEffect.LookAtOffset)
-	//		));
-	//}
-
-	{
-		SetActorLocation(
-		UKismetMathLibrary::VInterpTo(
-			GetActorLocation(),
-			GoalLocation,
-			DeltaTime,
-			4.6 / BlendTime));
-	}
-
-	if (BlendTime <= ElapsedTime)
-	{
-		FDetachmentTransformRules detachrules(EDetachmentRule::KeepWorld, 1);
-		DetachFromActor(detachrules);
-		ElapsedTime = 0;
-		bRotating = 0;
-	}
+	CurrentData.ElapsedTime += DeltaTime;
 }
 
-void ATurnbasedPhaseCamera::HandleShotType()
+void ATurnbasedPhaseCamera::HandleShotType(const FMoveCameraContext* InEffectContext)
 {
-	FCameraPreset* preset = CameraPresetDatas.FindOrAdd(CurrentData.ShotType);
-	FVector newLoc = preset->BaseOffset + ShotOrigin->GetActorLocation();
-	float armlength = preset->BaseArmLength;
+	// OriginActor
+	if (CurrentData.ShotType == ECameraShotType::ActorToActor || CurrentData.ShotType == ECameraShotType::ActorToLoc)
+	{
+		switch (CurrentData.OriginActor)
+		{
+		case EPayloadActorType::EventCauser:
+		{
+			OriginActor = InEffectContext->EventCauserActor.Get();
+			break;
+		}
+		case EPayloadActorType::EventTargets:
+		{
+			if (CurrentData.OriginActorSelectType == EPayloadTargetSelectType::Random)
+				OriginActor = InEffectContext->EventTargetActors[UKismetMathLibrary::RandomIntegerInRange(0, InEffectContext->EventTargetActors.Num() - 1)].Get();
+			else if (CurrentData.OriginActorSelectType == EPayloadTargetSelectType::First)
+				OriginActor = InEffectContext->EventTargetActors[0].Get();
+			else if (CurrentData.OriginActorSelectType == EPayloadTargetSelectType::Center)
+				OriginActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() / 2].Get();
+			else if (CurrentData.OriginActorSelectType == EPayloadTargetSelectType::Last)
+				OriginActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() - 1].Get();
+			break;
+		}
+		case EPayloadActorType::RuleSource:
+		{
+			OriginActor = InEffectContext->RuleSourceActor.Get();
+			break;
+		}
+		default:break;
+		}
+	}
 
-	GoalLocation = newLoc;
-	BlendTime = preset->BlendTime;
-	CameraBoom->TargetArmLength = armlength;
+	// DestActor
+	if (CurrentData.ShotType == ECameraShotType::ActorToActor || CurrentData.ShotType == ECameraShotType::LocToActor)
+	{
+		switch (CurrentData.DestActor)
+		{
+		case EPayloadActorType::EventCauser:
+		{
+			DestActor = InEffectContext->EventCauserActor.Get();
+			break;
+		}
+		case EPayloadActorType::EventTargets:
+		{
+			if (CurrentData.DestActorSelectType == EPayloadTargetSelectType::Random)
+				DestActor = InEffectContext->EventTargetActors[UKismetMathLibrary::RandomIntegerInRange(0, InEffectContext->EventTargetActors.Num() - 1)].Get();
+			else if (CurrentData.DestActorSelectType == EPayloadTargetSelectType::First)
+				DestActor = InEffectContext->EventTargetActors[0].Get();
+			else if (CurrentData.DestActorSelectType == EPayloadTargetSelectType::Center)
+				DestActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() / 2].Get();
+			else if (CurrentData.DestActorSelectType == EPayloadTargetSelectType::Last)
+				DestActor = InEffectContext->EventTargetActors[InEffectContext->EventTargetActors.Num() - 1].Get();
+			break;
+		}
+		case EPayloadActorType::RuleSource:
+		{
+			DestActor = InEffectContext->RuleSourceActor.Get();
+			break;
+		}
+		default:break;
+		}
+	}
+
 }
 
-void ATurnbasedPhaseCamera::HandleEventType()
+FVector ATurnbasedPhaseCamera::GetBlendOrigin()
 {
-	//TurnStart,ActionStart,HitConfirmed,Explosion,Interrupt,Death,ActionEnd
+	if (GetAttachParentActor())return FVector(-1e9);
+	if (CurrentData.ShotType == ECameraShotType::LocToActor || CurrentData.ShotType == ECameraShotType::LocToLoc)return CurrentData.OriginLoc;
+	FVector result;
+	result = OriginActor->GetActorLocation();
+	result += OriginActor->GetActorForwardVector() * CurrentData.OriginActorOffset.X;
+	result += OriginActor->GetActorRightVector() * CurrentData.OriginActorOffset.Y;
+	result += OriginActor->GetActorUpVector() * CurrentData.OriginActorOffset.Z;
+	return result;
 }
 
-void ATurnbasedPhaseCamera::HandleTargetCount()
+FVector ATurnbasedPhaseCamera::GetBlendDest()
 {
-
+	if (CurrentData.ShotType == ECameraShotType::ActorToLoc || CurrentData.ShotType == ECameraShotType::LocToLoc)return CurrentData.DestLoc;
+	FVector result;
+	result = DestActor->GetActorLocation();
+	result += DestActor->GetActorForwardVector() * CurrentData.DestActorOffset.X;
+	result += DestActor->GetActorRightVector() * CurrentData.DestActorOffset.Y;
+	result += DestActor->GetActorUpVector() * CurrentData.DestActorOffset.Z;
+	return result;
 }
 
-void ATurnbasedPhaseCamera::HandleSkillType()
+float ATurnbasedPhaseCamera::GetSpringArmLength()
 {
-	if (CurrentData.LookAtType == ECameraLookAtType::Target_Primary)
-	{
-		//LookAtLocation = CurrentData.TargetActors[0]->GetActorLocation();
-	}
-	else if (CurrentData.LookAtType == ECameraLookAtType::Target_RandomOnce)
-	{
-		//LookAtLocation = CurrentData.TargetActors
-		//	[UKismetMathLibrary::RandomIntegerInRange(0, CurrentData.TargetActors.Num() - 1)]
-		//->GetActorLocation();
-	}
-	else if (CurrentData.LookAtType == ECameraLookAtType::Target_Center)
-	{
-		//for(auto i : CurrentData.TargetActors)
-		//	LookAtLocation += i->GetActorLocation();
-		//LookAtLocation /= CurrentData.TargetActors.Num();
-	}
-	else if (CurrentData.LookAtType == ECameraLookAtType::ImpactPoint)
-	{
-		//LookAtLocation = CurrentData.GetHitResult()->ImpactPoint;
-	}
-	else if (CurrentData.LookAtType == ECameraLookAtType::Origin_Forward)
-	{
-		//LookAtLocation =
-		//	CurrentData.ShotOriginActor->GetActorLocation() +
-		//	CurrentData.ShotOriginActor->GetActorForwardVector();
-	}
+	return CurrentData.SpringArmCurve.GetRichCurve()->Eval(CurrentData.ElapsedTime);
 }
 
 void ATurnbasedPhaseCamera::Init(FTransform InTransform)
@@ -166,128 +197,25 @@ void ATurnbasedPhaseCamera::FocusSelectSkill(ATurnBasedCharacter* InCurrentTurnC
 {
 	CurrentTurnCharacter = InCurrentTurnCharacter;
 	CameraBoom->TargetArmLength = 300.f;
-	CameraBoom->bDoCollisionTest = 1;
 	SetActorTransform(InCurrentTurnCharacter->GetSelectSkillTransform());
 }
 
 void ATurnbasedPhaseCamera::SetTargetRotation(FRotator NewRotation)
 {
 	SetActorRotation(NewRotation);
-	//GoalTrasnform.SetRotation(FQuat4d(NewRotation));
 }
 
 bool ATurnbasedPhaseCamera::IsRotating()const 
 {
-	return bRotating || bReturning;
+	return bLocating || bRotating;
 }
 
 void ATurnbasedPhaseCamera::ApplyCameraMove(const FMoveCameraContext* InEffectContext)
 {
 	CurrentData = InEffectContext->Data;
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-	{
-		switch (CurrentData.ShotOrigin)
-		{
-		case EPayloadActorType::RuleSource:ShotOrigin = InEffectContext->RuleSourceActor.Get(); break;
-		case EPayloadActorType::EventCauser:ShotOrigin = InEffectContext->EventCauserActor.Get(); break;
-		case EPayloadActorType::EventTargets:ShotOrigin = InEffectContext->EventTargetActors[0].Get(); break;
-		default:break;
-		}
-	}
-	HandleShotType();
-	HandleEventType();
-	HandleTargetCount();
-	HandleSkillType();
+	HandleShotType(InEffectContext);
+	bLocating = 1;
 	bRotating = 1;
 }
-
-//void ATurnbasedPhaseCamera::ApplyCameraMove(const FCameraMoveEffectContext* InEffectContext)
-//{
-//	CurrentMoveEffect = *InEffectContext;
-//
-//	ReturnTransform = GetActorTransform();
-//	CameraBoom->TargetArmLength = CurrentMoveEffect.ArmLength;
-//	CameraBoom->bDoCollisionTest = CurrentMoveEffect.bEnableArmCollision;
-//
-//	if (CurrentMoveEffect.CameraMoveType == ECameraMoveType::SplineLocation)
-//	{
-//		//TODO
-//	}
-//	else if (CurrentMoveEffect.CameraMoveType == ECameraMoveType::FixedLocation)
-//	{
-//		SetActorLocation(CurrentMoveEffect.Location + CurrentMoveEffect.LocationOffset);
-//		GoalTrasnform.SetTranslation(CurrentMoveEffect.Location + CurrentMoveEffect.LocationOffset);
-//	}
-//	else if (CurrentMoveEffect.CameraMoveType == ECameraMoveType::CurrentToGoal)
-//	{
-//		GoalTrasnform.SetTranslation(CurrentMoveEffect.Location + CurrentMoveEffect.LocationOffset);
-//	}
-//	else if (CurrentMoveEffect.CameraMoveType == ECameraMoveType::StartToGoal)
-//	{
-//		SetActorLocation(CurrentMoveEffect.StartLocation + CurrentMoveEffect.LocationOffset);
-//		GoalTrasnform.SetTranslation(CurrentMoveEffect.Location + CurrentMoveEffect.LocationOffset);
-//	}
-//	else if (CurrentMoveEffect.CameraMoveType == ECameraMoveType::Target)
-//	{
-//		if (CurrentMoveEffect.LocationTargetActorType == ECameraGoalActorType::Owner) LocationActor = CurrentTurnCharacter;
-//		else if (CurrentMoveEffect.LocationTargetActorType == ECameraGoalActorType::Target)
-//		{
-//			UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
-//			LocationActor = asc->GetTarget();
-//		}
-//		FAttachmentTransformRules rules(EAttachmentRule::KeepWorld, true);
-//		AttachToActor(LocationActor.Get(), rules);
-//		SetActorRelativeLocation(CurrentMoveEffect.LocationOffset);
-//	}
-//
-//	if (CurrentMoveEffect.CameraLookAtType == ECameraLookAtType::SplineLocation)
-//	{
-//		//TODO
-//	}
-//	else if (CurrentMoveEffect.CameraLookAtType == ECameraLookAtType::FixedLocation)
-//	{
-//		SetActorRotation(
-//			FQuat4d(
-//				UKismetMathLibrary::FindLookAtRotation
-//				(GetActorLocation(), CurrentMoveEffect.LookAtLocation + CurrentMoveEffect.LookAtOffset)
-//			));
-//		GoalTrasnform.SetRotation(
-//			FQuat4d(
-//				UKismetMathLibrary::FindLookAtRotation
-//				(GetActorLocation(), CurrentMoveEffect.LookAtLocation + CurrentMoveEffect.LookAtOffset)
-//			));
-//	}
-//	else if (CurrentMoveEffect.CameraLookAtType == ECameraLookAtType::CurrentToGoal)
-//	{
-//		GoalTrasnform.SetRotation(
-//			FQuat4d(
-//				UKismetMathLibrary::FindLookAtRotation
-//				(CurrentMoveEffect.Location, CurrentMoveEffect.LookAtLocation + CurrentMoveEffect.LookAtOffset)
-//			));
-//	}
-//	else if (CurrentMoveEffect.CameraLookAtType == ECameraLookAtType::StartToGoal)
-//	{
-//		SetActorRotation(
-//			FQuat4d(
-//				UKismetMathLibrary::FindLookAtRotation
-//				(GetActorLocation(), InEffectContext->StartLookAtLocation + InEffectContext->LookAtOffset)
-//			));
-//		GoalTrasnform.SetRotation(
-//			FQuat4d(
-//				UKismetMathLibrary::FindLookAtRotation
-//				(CurrentMoveEffect.Location, CurrentMoveEffect.LookAtLocation + CurrentMoveEffect.LookAtOffset)
-//			));
-//	}
-//	else if (CurrentMoveEffect.CameraLookAtType == ECameraLookAtType::Target)
-//	{
-//		if (CurrentMoveEffect.LookAtTargetActorType == ECameraGoalActorType::Owner) LookAtTargetActor = CurrentTurnCharacter;
-//		else if (CurrentMoveEffect.LookAtTargetActorType == ECameraGoalActorType::Target)
-//		{
-//			UAbilityComponent* asc = Cast<UAbilityComponent>(CurrentTurnCharacter->GetAbilitySystemComponent());
-//			LookAtTargetActor = asc->GetTarget();
-//		}
-//	}
-//
-//	bRotating = 1;
-//	bReturning = 0;
-//}

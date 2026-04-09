@@ -17,6 +17,8 @@ class ATurnBasedCharacter;
 DECLARE_DELEGATE_OneParam(FOnSkillIconMouseEnter, FGameplayTag);
 DECLARE_DELEGATE_OneParam(FOnSkillIconMouseLeave, FGameplayTag);
 DECLARE_DELEGATE(FOnSkillIconClicked);
+DECLARE_DELEGATE_OneParam(FOnTargetHovered, AActor*);
+DECLARE_DELEGATE_TwoParams(FOnTargetClicked, AActor*, FKey);
 
 UCLASS()
 class DEMO_API UUW_TBSelect_SkillIcon : public UUserWidget
@@ -81,12 +83,17 @@ public:
 	FOnSkillIconMouseLeave OnSkillIconMouseLeave;
 	FOnSkillIconClicked OnSkillIconClicked;
 
+	FOnTargetHovered OnTargetHovered;
+	FOnTargetClicked OnTargetClicked;
+
 	//function
 private:
 	void CreateIcon();
 	UFUNCTION()void ExecuteOnSkillIconMouseEnter(FGameplayTag InSkillTag);
 	UFUNCTION()void ExecuteOnSkillIconMouseLeave(FGameplayTag InSkillTag);
 	UFUNCTION()void ExecuteOnSkillIconClicked();
+	UFUNCTION()void ExecuteOnTargetHovered(AActor* InTarget);
+	UFUNCTION()void ExecuteOnTargetClicked(AActor* InTarget);
 protected:
 public:
 	void Activate(ATurnBasedCharacter* NewTurnCharacter);

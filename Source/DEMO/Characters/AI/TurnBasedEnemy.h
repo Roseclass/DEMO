@@ -8,9 +8,10 @@
  * 
  */
 
-class UUW_TurnBased_Select;
+class UUW_TBSelect;
 
-DECLARE_DELEGATE(FTurnBasedEnemySignature);
+DECLARE_DELEGATE_OneParam(FTurnBasedEnemySelectSkill, FGameplayTag);
+DECLARE_DELEGATE_OneParam(FTurnBasedEnemySelectTarget, AActor*);
 
 UCLASS()
 class DEMO_API ATurnBasedEnemy : public ATurnBasedCharacter
@@ -25,14 +26,14 @@ public:
 
 	//property
 private:
-	UPROPERTY()UUW_TurnBased_Select* SelectWidget;
+	UPROPERTY()UUW_TBSelect* SelectWidget;
 protected:
 public:
-	FTurnBasedEnemySignature OnLeft;
-	FTurnBasedEnemySignature OnRight;
-	FTurnBasedEnemySignature OnUp;
-	FTurnBasedEnemySignature OnDown;
-	FTurnBasedEnemySignature OnConfirm;
+	FTurnBasedEnemySelectSkill OnHoverSkillIcon;
+	FTurnBasedEnemySelectSkill OnClickSkillIcon;
+
+	FTurnBasedEnemySelectTarget OnHoverTarget;
+	FTurnBasedEnemySelectTarget OnClickTarget;
 
 	//function
 private:
@@ -42,19 +43,12 @@ protected:
 public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 
-	void SelectLeft();
-	void SelectRight();
-	void SelectUp();
-	void SelectDown();
-	void Confirm();
+	void HoverSkillIcon(FGameplayTag InTag);
+	void ClickSkillIcon(FGameplayTag InTag);
 
-	void LinkSelectWidget(UUW_TurnBased_Select* NewSelectWidget);
+	void HoverTarget(AActor* InTarget);
+	void ClickTarget(AActor* InTarget);
 
-	FGameplayTag GetCurrentSkillTag()const;
-	TArray<FGameplayTag> GetAllSkillTags()const;
+	void LinkSelectWidget(UUW_TBSelect* NewSelectWidget);
 
-	ATurnBasedCharacter* GetCurrentTarget()const;
-	TArray<ATurnBasedCharacter*> GetTargetArray()const;
-	TArray<ATurnBasedCharacter*> GetPlayerArray()const;
-	TArray<ATurnBasedCharacter*> GetEnemyArray()const;
 };

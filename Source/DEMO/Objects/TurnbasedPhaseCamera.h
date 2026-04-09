@@ -9,7 +9,6 @@
 class USpringArmComponent;
 class UCameraComponent;
 class ATurnBasedCharacter;
-class UDA_MoveCamera;
 
 USTRUCT(BlueprintType)
 struct FCameraPreset : public FTableRowBase
@@ -39,20 +38,14 @@ public:
 
 	//property
 private:
-	UDataTable* CameraPresetDT;
-	TMap<ECameraShotType, FCameraPreset*>CameraPresetDatas;
-
 	TWeakObjectPtr<ATurnBasedCharacter> CurrentTurnCharacter;
 
 	FTransform InitialTransform;
-	FVector GoalLocation;
-	FVector LookAtLocation;
+	bool bLocating;
 	bool bRotating;
-	bool bReturning;
-	float BlendTime;
-	float ElapsedTime;
 
-	AActor* ShotOrigin;
+	AActor* OriginActor;
+	AActor* DestActor;
 	FMoveCameraData CurrentData;
 protected:
 	//scene
@@ -67,12 +60,11 @@ public:
 
 	//function
 private:
-	void ReturnInterp(float DeltaTime);
-	void InterpToGoal(float DeltaTime);
-	void HandleShotType();
-	void HandleEventType();
-	void HandleTargetCount();
-	void HandleSkillType();	
+	void BlendToTarget(float DeltaTime);
+	void HandleShotType(const FMoveCameraContext* InEffectContext);
+	FVector GetBlendOrigin();
+	FVector GetBlendDest();
+	float GetSpringArmLength();
 protected:
 public:
 	void Init(FTransform InTransform);

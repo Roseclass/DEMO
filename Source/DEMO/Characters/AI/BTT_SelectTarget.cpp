@@ -4,6 +4,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BTFunctionLibrary.h"
 
+#include "Characters/AI/BlackboardTypes.h"
 #include "Characters/TurnBasedCharacter.h"
 #include "Characters/AI/TurnBasedEnemy.h"
 #include "Characters/AI/TurnBasedAIController.h"
@@ -11,83 +12,125 @@
 
 #include "GameAbilities/AbilityComponent.h"
 
-UBTT_SelectTarget::UBTT_SelectTarget()
-{
-	NodeName = "SelectTarget";
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////UBTT_SelectTarget_Hover///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	SelectedCharacter.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectTarget, SelectedCharacter), ATurnBasedCharacter::StaticClass());
-	TargetCharacter.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectTarget, TargetCharacter), ATurnBasedCharacter::StaticClass());
+UBTT_SelectTarget_Hover::UBTT_SelectTarget_Hover()
+{
+	NodeName = "SelectTarget_Hover";
+
+	Data.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectTarget_Hover, Data), UTurnBasedBlackboardContainer::StaticClass());
 }
 
-EBTNodeResult::Type UBTT_SelectTarget::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UBTT_SelectTarget_Hover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	Super::ExecuteTask(OwnerComp, NodeMemory);
 
 	UBlackboardComponent* blackboardComp = OwnerComp.GetBlackboardComponent();
-	if (!blackboardComp)return EBTNodeResult::Failed;
+	if (!blackboardComp)
+	{
+		CLog::Print("UBTT_SelectTarget_Hover::ExecuteTask blackboardComp cast failed!!",-1,0);
+		return EBTNodeResult::Failed;
+	}
 
 	AAIController* controller = Cast<AAIController>(OwnerComp.GetOwner());
-	UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(controller);
+	if (!controller)
+	{
+		CLog::Print("UBTT_SelectTarget_Hover::ExecuteTask controller cast failed!!", -1, 0);
+		return EBTNodeResult::Failed;
+	}
 
 	ATurnBasedEnemy* aiPawn = Cast<ATurnBasedEnemy>(controller->GetPawn());
-	UAbilityComponent* asc = CHelpers::GetComponent<UAbilityComponent>(aiPawn);
-
-	TArray<ATurnBasedCharacter*> targetArray = aiPawn->GetTargetArray();
-	int32 size = targetArray.Num();
-
-	ATurnBasedCharacter* currentTarget = Cast<ATurnBasedCharacter>(blackboardComp->GetValueAsObject(SelectedCharacter.SelectedKeyName));
-	ATurnBasedCharacter* targetTarget = Cast<ATurnBasedCharacter>(blackboardComp->GetValueAsObject(TargetCharacter.SelectedKeyName));
-
-	if (!targetTarget)
+	if (!aiPawn)
 	{
-		CLog::Print("UBTT_SelectTarget::ExecuteTask Target is nullptr", -1, 10, FColor::Red);
+		CLog::Print("UBTT_SelectTarget_Hover::ExecuteTask aiPawn cast failed!!", -1, 0);
 		return EBTNodeResult::Failed;
 	}
 
-	if (currentTarget == targetTarget) return EBTNodeResult::Succeeded;
-
-	int32 idx = -1;
-	int32 tIdx = -1;
-
-	for (int32 i = 0; i < size; i++)
+	UTurnBasedBlackboardContainer* data = Cast<UTurnBasedBlackboardContainer>(blackboardComp->GetValueAsObject(Data.SelectedKeyName));
+	if (!data)
 	{
-		if (targetArray[i] == currentTarget)idx = i;
-		if (targetArray[i] == targetTarget)tIdx = i;
-	}
-
-	if (idx < 0)
-	{
-		CLog::Print("UBTT_SelectSkill::ExecuteTask currentTarget is nullptr", -1, 10, FColor::Red);
+		CLog::Print("UBTT_SelectTarget_Hover::ExecuteTask data cast failed!!", -1, 0);
 		return EBTNodeResult::Failed;
 	}
 
-	if (tIdx < 0)
+	ATurnBasedCharacter* target = nullptr;
+	for (int32 i = 0; i < data->SkillTargets.Num(); i++)
 	{
-		CLog::Print("UBTT_SelectSkill::ExecuteTask Target is nullptr", -1, 10, FColor::Red);
+		if (!data->SelectedTargets.IsValidIndex(i))
+			target = data->SkillTargets[i];
+	}
+	
+	if (target)
+	{
+		data->SelectedTargets.Add(target);
+		aiPawn->HoverTarget(target);
+	}
+	else
+	{
+		CLog::Print("UBTT_SelectTarget_Hover::ExecuteTask target is nullptr!!", -1, 0);
 		return EBTNodeResult::Failed;
-	}
-
-	int32 lIdx = tIdx;
-	int32 rIdx = tIdx;
-
-	if (idx < tIdx)lIdx = tIdx - size;
-	else rIdx = tIdx + size;
-
-	if (abs(rIdx - idx) < abs(lIdx - idx))
-	{
-		aiPawn->SelectRight();
-		blackboardComp->SetValueAsObject(SelectedCharacter.SelectedKeyName, targetArray[(idx + 1) % size]);
-	}
-	else 
-	{
-		aiPawn->SelectLeft();
-		blackboardComp->SetValueAsObject(SelectedCharacter.SelectedKeyName, targetArray[(idx - 1 + size) % size]);
 	}
 
 	return EBTNodeResult::Succeeded;
 }
 
-FString UBTT_SelectTarget::GetStaticDescription() const
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////UBTT_SelectTarget_Hover///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+UBTT_SelectTarget_Click::UBTT_SelectTarget_Click()
 {
-	return Super::GetStaticDescription();
+	NodeName = "SelectTarget_Click";
+
+	Data.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectTarget_Click, Data), UTurnBasedBlackboardContainer::StaticClass());
 }
+
+EBTNodeResult::Type UBTT_SelectTarget_Click::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	Super::ExecuteTask(OwnerComp, NodeMemory);
+
+	UBlackboardComponent* blackboardComp = OwnerComp.GetBlackboardComponent();
+	if (!blackboardComp)
+	{
+		CLog::Print("UBTT_SelectTarget_Click::ExecuteTask blackboardComp cast failed!!", -1, 0);
+		return EBTNodeResult::Failed;
+	}
+
+	AAIController* controller = Cast<AAIController>(OwnerComp.GetOwner());
+	if (!controller)
+	{
+		CLog::Print("UBTT_SelectTarget_Click::ExecuteTask controller cast failed!!", -1, 0);
+		return EBTNodeResult::Failed;
+	}
+
+	ATurnBasedEnemy* aiPawn = Cast<ATurnBasedEnemy>(controller->GetPawn());
+	if (!aiPawn)
+	{
+		CLog::Print("UBTT_SelectTarget_Click::ExecuteTask aiPawn cast failed!!", -1, 0);
+		return EBTNodeResult::Failed;
+	}
+
+	UTurnBasedBlackboardContainer* data = Cast<UTurnBasedBlackboardContainer>(blackboardComp->GetValueAsObject(Data.SelectedKeyName));
+	if (!data)
+	{
+		CLog::Print("UBTT_SelectTarget_Click::ExecuteTask data cast failed!!", -1, 0);
+		return EBTNodeResult::Failed;
+	}
+
+	aiPawn->ClickTarget(data->SelectedTargets[data->SelectedTargets.Num() - 1]);
+
+	return EBTNodeResult::Succeeded;
+}
+
+/*
+* 
+* 스킬 호버->선택->타겟뷰->타겟호버<->타겟클릭->playsequence
+* 
+* 일단 링크는 다했음
+* widget activate확인
+* 
+* 본인턴아닐때 마우스 호버 끄기
+* 
+*/

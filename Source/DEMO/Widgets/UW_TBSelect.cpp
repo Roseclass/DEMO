@@ -105,6 +105,16 @@ void UUW_TBSelect::ExecuteOnSkillIconClicked()
 	OnSkillIconClicked.ExecuteIfBound();
 }
 
+void UUW_TBSelect::ExecuteOnTargetHovered(AActor* InTarget)
+{
+	OnTargetHovered.ExecuteIfBound(InTarget);
+}
+
+void UUW_TBSelect::ExecuteOnTargetClicked(AActor* InTarget)
+{
+	OnTargetClicked.ExecuteIfBound(InTarget, EKeys::LeftMouseButton);
+}
+
 void UUW_TBSelect::Activate(ATurnBasedCharacter* NewTurnCharacter)
 {
 	GetOwningPlayer()->SetShowMouseCursor(1);
@@ -112,12 +122,11 @@ void UUW_TBSelect::Activate(ATurnBasedCharacter* NewTurnCharacter)
 	ATurnBasedEnemy* enemy = Cast<ATurnBasedEnemy>(TurnCharacter);
 	if (enemy)
 	{
-		//enemy->LinkSelectWidget(nullptr);
-		//enemy->OnLeft.Unbind();
-		//enemy->OnRight.Unbind();
-		//enemy->OnUp.Unbind();
-		//enemy->OnDown.Unbind();
-		//enemy->OnConfirm.Unbind();
+		enemy->LinkSelectWidget(nullptr);
+		enemy->OnHoverSkillIcon.Unbind();
+		enemy->OnClickSkillIcon.Unbind();
+		enemy->OnHoverTarget.Unbind();
+		enemy->OnClickTarget.Unbind();
 	}
 
 	TurnCharacter = NewTurnCharacter;
@@ -149,12 +158,11 @@ void UUW_TBSelect::Activate(ATurnBasedCharacter* NewTurnCharacter)
 	enemy = Cast<ATurnBasedEnemy>(TurnCharacter);
 	if (enemy)
 	{
-		////enemy->LinkSelectWidget(this);
-		////enemy->OnLeft.BindUFunction(this, "Left");
-		////enemy->OnRight.BindUFunction(this, "Right");
-		////enemy->OnUp.BindUFunction(this, "Up");
-		////enemy->OnDown.BindUFunction(this, "Down");
-		////enemy->OnConfirm.BindUFunction(this, "Confirm");
+		enemy->LinkSelectWidget(this);
+		enemy->OnHoverSkillIcon.BindUFunction(this, "ExecuteOnSkillIconMouseEnter");
+		enemy->OnClickSkillIcon.BindUFunction(this, "ExecuteOnSkillIconClicked");
+		enemy->OnHoverTarget.BindUFunction(this, "ExecuteOnTargetHovered");
+		enemy->OnClickTarget.BindUFunction(this, "ExecuteOnTargetClicked");
 	}
 
 }

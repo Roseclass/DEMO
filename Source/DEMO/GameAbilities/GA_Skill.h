@@ -37,6 +37,7 @@ private:
 protected:
 	int32 ApplyGEDataIdx;
 	int32 ReserveActionDataIdx;
+	int32 ScriptedMoveDataIdx;
 	int32 SpawnDamageDealerDataIdx;
 
 	UPROPERTY(EditAnywhere, Category = "Data")
@@ -70,6 +71,9 @@ public:
 		FGameplayTag NextReserveActionTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
+		FGameplayTag NextScriptedMoveTriggerTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
 		FGameplayTag NextSpawnDamageDealerTriggerTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = Tags, meta = (Categories = "AbilityTagCategory"))
@@ -87,6 +91,7 @@ protected:
 	virtual void SpawnFX(FGameplayTag InTag);
 	virtual void ApplyGE();
 	virtual void ReserveAction();
+	virtual void ScriptedMove();
 	virtual void SpawnDamageDealer();
 
 	virtual float GetCooldown(const FGameplayAbilityActorInfo* ActorInfo)const;
@@ -127,15 +132,27 @@ public:
 
 
 /*
+* 
+* terra 사이클 테스트
+* gideon 사이클 테스트
+* minion ai추가 사이클 테스트
+* healthbar추가
+* 
+* 
+* 
+fx 적용룰은 ge가 적용된걸 볼수있게, 스턴이 적용된걸 볼수있게, 체력이 닳는걸 확인할수있게 라는 기준이야
+ge가 적용된건 특정 fx를 붙여주면 되겠고
+스턴은 모션도 있지만 머리위에 공용스턴 fx를 붙일거고
+체력이 닳는건 자체 커브를 이용해 잠깐 몸이 빨개지게 할거야
+덤으로 하늘에서 떨어지는 모션을 greystone이 갖고있는데 그타이밍에 맞게 먼지같은거나 카메라 쉐잌 넣으면 될듯
+
 gideon,morigesh,terra fx rule 마무리
 revenantmarkfx stack 연출 딜레이 필요함
-gideonhealfx merge
+morigesh ult
+gideon fx추가
 
-scriptedmove test
-sidebar연동, health turngauge 연동
-minion추가
-
-카메라 시스템 마무리
+매니저 ui업데이트 페이즈 추가
+여러 이펙트 계산 적용시에 추가할 딜레이 연출 생각하기
 
 death핸들 촘촘하게,승리패배판정 다시테스트
 tps<->tb 오류있는지 검사

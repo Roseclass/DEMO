@@ -162,7 +162,6 @@ public:
         return NewContext;
     }
 public:
-    TWeakObjectPtr<AActor> MoveInstigator;
     FScriptedMoveData Data;
 };
 

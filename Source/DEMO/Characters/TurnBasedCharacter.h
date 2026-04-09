@@ -36,6 +36,7 @@ public:
 	//property
 private:
 	TArray<FScriptedMoveData> PendingScriptedMoves;
+	FScriptedMoveData* CurrentScriptedMove;
 protected:
 	FTurnBasedCharacterRuntimeData RuntimeData;
 	//scene
@@ -60,7 +61,7 @@ public:
 	virtual void Init(FGuid NewSaveName, UPrimaryDataAsset* DA) override;
 	virtual FGameplayTag GetDataTag() const override;
 
-	void EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext);
+	void EnqueueScriptedMove(const FScriptedMoveContext* InEffectContext, const FTransform& OriginTransform);
 	void ApplyHighlight(EHighlightType HighlightType);
 
 	//from runtime

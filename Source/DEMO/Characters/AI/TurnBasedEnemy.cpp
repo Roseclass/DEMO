@@ -77,62 +77,27 @@ void ATurnBasedEnemy::Init(FGuid NewSaveName, UPrimaryDataAsset* DA)
 	controller->Init(bt);
 }
 
-void ATurnBasedEnemy::SelectLeft()
+void ATurnBasedEnemy::HoverSkillIcon(FGameplayTag InTag)
 {
-	OnLeft.Execute();
+	OnHoverSkillIcon.ExecuteIfBound(InTag);
 }
 
-void ATurnBasedEnemy::SelectRight()
+void ATurnBasedEnemy::ClickSkillIcon(FGameplayTag InTag)
 {
-	OnRight.Execute();
+	OnClickSkillIcon.ExecuteIfBound(InTag);
 }
 
-void ATurnBasedEnemy::SelectUp()
+void ATurnBasedEnemy::HoverTarget(AActor* InTarget)
 {
-	OnUp.Execute();
+	OnHoverTarget.ExecuteIfBound(InTarget);
 }
 
-void ATurnBasedEnemy::SelectDown()
+void ATurnBasedEnemy::ClickTarget(AActor* InTarget)
 {
-	OnDown.Execute();
+	OnClickTarget.ExecuteIfBound(InTarget);
 }
 
-void ATurnBasedEnemy::Confirm()
-{
-	OnConfirm.Execute();
-}
-
-void ATurnBasedEnemy::LinkSelectWidget(UUW_TurnBased_Select* NewSelectWidget)
+void ATurnBasedEnemy::LinkSelectWidget(UUW_TBSelect* NewSelectWidget)
 {
 	SelectWidget = NewSelectWidget;
-}
-
-FGameplayTag ATurnBasedEnemy::GetCurrentSkillTag()const
-{
-	return SelectWidget->GetCurrentSkillTag();
-}
-
-TArray<FGameplayTag> ATurnBasedEnemy::GetAllSkillTags() const
-{
-	return SelectWidget->GetAllSkillTags();
-}
-
-ATurnBasedCharacter* ATurnBasedEnemy::GetCurrentTarget()const
-{
-	return SelectWidget->GetCurrentTarget();
-}
-
-TArray<ATurnBasedCharacter*> ATurnBasedEnemy::GetTargetArray()const
-{
-	return SelectWidget->GetTargetArray();
-}
-
-TArray<ATurnBasedCharacter*> ATurnBasedEnemy::GetPlayerArray()const
-{
-	return SelectWidget->GetPlayerArray();
-}
-
-TArray<ATurnBasedCharacter*> ATurnBasedEnemy::GetEnemyArray()const
-{
-	return SelectWidget->GetEnemyArray();
 }

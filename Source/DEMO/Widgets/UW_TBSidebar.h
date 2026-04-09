@@ -37,6 +37,8 @@ public:
 	void RemovePortraitsByTag(FGameplayTag DataTag);
 	void InsertPortraitAt(int32 Idx, FGameplayTag DataTag);
 	void AddPortrait(FGameplayTag DataTag);
+
+	int32 GetCurrentSize() const;
 };
 
 DECLARE_DELEGATE_OneParam(FOnPortraitRemoveAnimEnd, UWidget*);

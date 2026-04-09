@@ -8,27 +8,35 @@
  * 
  */
 UCLASS()
-class DEMO_API UBTT_SelectTarget : public UBTTaskNode
+class DEMO_API UBTT_SelectTarget_Hover : public UBTTaskNode
 {
 	GENERATED_BODY()
 public:
-	UBTT_SelectTarget();
+	UBTT_SelectTarget_Hover();
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-	virtual FString GetStaticDescription() const override;
 
 	//property
 private:
 protected:
 	UPROPERTY(EditAnywhere, Category = "Character")
-		FBlackboardKeySelector SelectedCharacter;
-
-	UPROPERTY(EditAnywhere, Category = "Character")
-		FBlackboardKeySelector TargetCharacter;
+		FBlackboardKeySelector Data;
 public:
+};
 
-	//function
+UCLASS()
+class DEMO_API UBTT_SelectTarget_Click : public UBTTaskNode
+{
+	GENERATED_BODY()
+public:
+	UBTT_SelectTarget_Click();
+protected:
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+
+	//property
 private:
 protected:
+	UPROPERTY(EditAnywhere, Category = "Character")
+		FBlackboardKeySelector Data;
 public:
 };

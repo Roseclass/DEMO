@@ -17,6 +17,7 @@ UGA_Skill::UGA_Skill()
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NextApplyGETriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextApplyGE");
 	NextReserveActionTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextReserveAction");
+	NextScriptedMoveTriggerTag = FGameplayTag::RequestGameplayTag("GameplayCue.ScriptedMove");
 	NextSpawnDamageDealerTriggerTag = FGameplayTag::RequestGameplayTag("Skill.System.NextDamageDealer");
 	CHelpers::GetClass<UGameplayEffect>(&CooldownGameplayEffectClass, "Blueprint'/Game/GAS/GE/GE_Cooldown.GE_Cooldown_C'");
 }
@@ -160,29 +161,32 @@ void UGA_Skill::InitAbility()
 	MoveCameraDataIdx = 0;
 	ApplyGEDataIdx = 0;
 	ReserveActionDataIdx = 0;
+	ScriptedMoveDataIdx = 0;
 	SpawnDamageDealerDataIdx = 0;
+
+	{ 
+		FGameplayTagContainer tags;
+		tags.AddTag(NextMontageTriggerTag);
+		tags.AddTag(NextCameraMoveTriggerTag);
+		tags.AddTag(EndTag);
+		tags.AddTag(FXTriggerTag);
+		tags.AddTag(NextApplyGETriggerTag);
+		tags.AddTag(NextReserveActionTriggerTag);
+		tags.AddTag(NextScriptedMoveTriggerTag);
+		tags.AddTag(NextSpawnDamageDealerTriggerTag);
+		UAT_SkillNotifyEvent* task = UAT_SkillNotifyEvent::CreateSkillNotifyEvent(this, NAME_None, tags);
+		task->EventReceived.AddDynamic(this, &UGA_Skill::EventReceived);
+
+		// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
+		task->ReadyForActivation();
+	}
 
 	FTimerHandle WaitHandle;
 	GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
 		{
-			FGameplayTagContainer tags;
-			tags.AddTag(NextMontageTriggerTag);
-			tags.AddTag(NextCameraMoveTriggerTag);
-			tags.AddTag(EndTag);
-			tags.AddTag(FXTriggerTag);
-			tags.AddTag(NextApplyGETriggerTag);
-			tags.AddTag(NextReserveActionTriggerTag);
-			tags.AddTag(NextSpawnDamageDealerTriggerTag);
-			UAT_SkillNotifyEvent* task = UAT_SkillNotifyEvent::CreateSkillNotifyEvent(this, NAME_None, tags);
-			task->EventReceived.AddDynamic(this, &UGA_Skill::EventReceived);
-
-			// ReadyForActivation()는 C++에서 AbilityTask를 활성화 시킨다. Blueprint는 K2Node_LatentGameplayTaskCall에서 자동으로 ReadyForActivation()를 호출한다.
-			task->ReadyForActivation();
-
 			PlayKeyMontage();
 			PlaySubMontages();
 			MontageDataIdx++;
-
 		}), MontageDatas[MontageDataIdx].StartDelay, false);
 	MoveCamera();
 }
@@ -199,9 +203,13 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 	}
 	else if (EventTag == NextMontageTriggerTag)
 	{
-		PlayKeyMontage();
-		PlaySubMontages();
-		++MontageDataIdx;
+		FTimerHandle WaitHandle;
+		GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
+			{
+				PlayKeyMontage();
+				PlaySubMontages();
+				++MontageDataIdx;
+			}), MontageDatas[MontageDataIdx].StartDelay, false);
 		return;
 	}
 	else if (EventTag == NextCameraMoveTriggerTag)
@@ -222,6 +230,11 @@ void UGA_Skill::EventReceived(FGameplayTag EventTag, FGameplayEventData EventDat
 	else if (EventTag == NextReserveActionTriggerTag)
 	{
 		ReserveAction();
+		return;
+	}
+	else if (EventTag == NextScriptedMoveTriggerTag)
+	{
+		ScriptedMove();
 		return;
 	}
 	else if (EventTag == NextSpawnDamageDealerTriggerTag)
@@ -292,6 +305,26 @@ void UGA_Skill::ReserveAction()
 
 	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
 	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ReserveAction"), gameplayCueParameters);
+}
+
+void UGA_Skill::ScriptedMove()
+{
+	UDA_GCNPayload* payload = EventPayloads.Get();
+	CheckTrue(!payload);
+	CheckTrue(!payload->ScriptedMove.IsValidIndex(ScriptedMoveDataIdx));
+
+	UAbilityComponent* asc = Cast<UAbilityComponent>(GetCurrentActorInfo()->AbilitySystemComponent);
+	FGameplayCueParameters gameplayCueParameters;
+
+	FScriptedMoveContext* context = new FScriptedMoveContext();
+	context->RuleSourceActor = GetCurrentActorInfo()->AvatarActor.Get();
+	context->EventCauserActor = GetCurrentActorInfo()->AvatarActor.Get();
+	for (auto ch : asc->GetTargets())
+		context->EventTargetActors.Add(ch);
+	context->Data = payload->ScriptedMove[ScriptedMoveDataIdx++];
+
+	gameplayCueParameters.EffectContext = FGameplayEffectContextHandle(context);
+	asc->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag("GameplayCue.ScriptedMove"), gameplayCueParameters);
 }
 
 void UGA_Skill::SpawnDamageDealer()

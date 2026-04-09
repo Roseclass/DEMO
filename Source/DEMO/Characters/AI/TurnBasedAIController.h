@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "BehaviorTree/BehaviorTreeTypes.h"
 #include "TurnBasedAIController.generated.h"
 
 /**
@@ -46,4 +47,5 @@ public:
 	void StopLogic(FString Reason);
 	void RestartLogic();
 
+	FName GetDataKeyName()const;
 };

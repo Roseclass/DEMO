@@ -121,11 +121,11 @@ public:
 		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.CastMassive");
 		revenant.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Revenant.CastUlt");
 
-		FSaveUIData& terra = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Terra"));
-		terra.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Terra.Attack");
-		terra.EquippedSkillTags[int32(ESkillSlotLocation::Skill_0)] = FGameplayTag::RequestGameplayTag("Skill.Terra.ProtectBuff");
-		terra.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Terra.CounterAttack");
-		terra.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Terra.Stun");
+		FSaveUIData& greystone = saveGameData->SavedPlayerUIDatas.FindOrAdd(FGameplayTag::RequestGameplayTag("Skill.Greystone"));
+		greystone.EquippedSkillTags[int32(ESkillSlotLocation::Attack)] = FGameplayTag::RequestGameplayTag("Skill.Greystone.Attack");
+		greystone.EquippedSkillTags[int32(ESkillSlotLocation::Skill_0)] = FGameplayTag::RequestGameplayTag("Skill.Greystone.ProtectBuff");
+		greystone.EquippedSkillTags[int32(ESkillSlotLocation::Skill_1)] = FGameplayTag::RequestGameplayTag("Skill.Greystone.CounterAttack");
+		greystone.EquippedSkillTags[int32(ESkillSlotLocation::Passive)] = FGameplayTag::RequestGameplayTag("Skill.Greystone.Stun");
 
 		key = FGuid::NewGuid();
 		saveGameData->SavedEnemyDatas;

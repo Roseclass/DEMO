@@ -49,6 +49,15 @@ public:
 	FGameplayTag SkillTag;
 };
 
+USTRUCT()
+struct FTurnOrderCheckpoint
+{
+	GENERATED_BODY()
+public:
+	TMap<ATurnBasedCharacter*, float> GaugeMap;
+	ATurnBasedCharacter* CurrentTurnCharacter;
+};
+
 UCLASS()
 class DEMO_API ATurnBasedPhaseManager : public AActor
 {
@@ -90,6 +99,9 @@ private:
 	TArray<ATurnBasedCharacter*> PendingDeadArray;
 	TSet<ATurnBasedCharacter*> HandledDeadSet;
 	TArray<ATurnBasedCharacter*> LocationArray[2];
+	TMap<ATurnBasedCharacter*, FTransform> TransformOrigin;
+
+	TArray<FTurnOrderCheckpoint> TurnOrder;
 protected:
 public:
 
@@ -106,6 +118,7 @@ private:
 
 	void HighlightAvailableTargets();
 	void ClearAvailableTargets();
+	void UpdateSidebar();
 
 	EReservedActionType ConsumeAfterCurrentAction();
 	EReservedActionType ConsumeStartOfNextTurn();

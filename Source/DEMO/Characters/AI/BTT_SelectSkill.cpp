@@ -5,83 +5,106 @@
 #include "BehaviorTree/BTFunctionLibrary.h"
 
 #include "Characters/TurnBasedCharacter.h"
+
+#include "Characters/AI/BlackboardTypes.h"
 #include "Characters/AI/TurnBasedEnemy.h"
 #include "Characters/AI/TurnBasedAIController.h"
 #include "Characters/AI/TurnBasedBehaviorComponent.h"
 
 #include "GameAbilities/AbilityComponent.h"
 
-UBTT_SelectSkill::UBTT_SelectSkill()
-{
-	NodeName = "SelectSkill";
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////UBTT_SelectSkill_Hover///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	SelectedSkillTag.AddStringFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectSkill, SelectedSkillTag));
-	TargetSkillTag.AddStringFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectSkill, TargetSkillTag));
+UBTT_SelectSkill_Hover::UBTT_SelectSkill_Hover()
+{
+	NodeName = "SelectSkill_Hover";
+
+	Data.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectSkill_Hover, Data), UTurnBasedBlackboardContainer::StaticClass());
 }
 
-EBTNodeResult::Type UBTT_SelectSkill::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UBTT_SelectSkill_Hover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	Super::ExecuteTask(OwnerComp, NodeMemory);
 
 	UBlackboardComponent* blackboardComp = OwnerComp.GetBlackboardComponent();
-	if (!blackboardComp)return EBTNodeResult::Failed;
+	if (!blackboardComp)
+	{
+		CLog::Print("UBTT_SelectSkill_Hover::ExecuteTask blackboardComp cast failed!!");
+		return EBTNodeResult::Failed;
+	}
 
 	AAIController* controller = Cast<AAIController>(OwnerComp.GetOwner());
-	UTurnBasedBehaviorComponent* behavior = CHelpers::GetComponent<UTurnBasedBehaviorComponent>(controller);
+	if (!controller)
+	{
+		CLog::Print("UBTT_SelectSkill_Hover::ExecuteTask controller cast failed!!");
+		return EBTNodeResult::Failed;
+	}
 
 	ATurnBasedEnemy* aiPawn = Cast<ATurnBasedEnemy>(controller->GetPawn());
-	UAbilityComponent* asc = CHelpers::GetComponent<UAbilityComponent>(aiPawn);
-
-	TArray<FGameplayTag> equippedSkillTags = aiPawn->GetEquippedSkillTags();
-	int32 size = equippedSkillTags.Num();
-
-	FString currentTag = blackboardComp->GetValueAsString(SelectedSkillTag.SelectedKeyName);
-	FString targetTag = blackboardComp->GetValueAsString(TargetSkillTag.SelectedKeyName);
-
-	if (currentTag == targetTag) return EBTNodeResult::Succeeded;
-
-	int32 idx = -1;
-	int32 tIdx = -1;
-
-	for (int32 i = 0; i < size; i++)
+	if (!aiPawn)
 	{
-		if (equippedSkillTags[i].ToString() == currentTag)idx = i;
-		if (equippedSkillTags[i].ToString() == targetTag)tIdx = i;
-	}
-
-	if (idx < 0)
-	{
-		CLog::Print("UBTT_SelectSkill::ExecuteTask currentTag is NOT VALID", -1, 10, FColor::Red);
+		CLog::Print("UBTT_SelectSkill_Hover::ExecuteTask aiPawn cast failed!!");
 		return EBTNodeResult::Failed;
 	}
 
-	if (tIdx < 0)
+	UTurnBasedBlackboardContainer* data = Cast<UTurnBasedBlackboardContainer>(blackboardComp->GetValueAsObject(Data.SelectedKeyName));
+	if (!data)
 	{
-		CLog::Print("UBTT_SelectSkill::ExecuteTask targetTag is NOT VALID", -1, 10, FColor::Red);
+		CLog::Print("UBTT_SelectSkill_Hover::ExecuteTask data cast failed!!");
 		return EBTNodeResult::Failed;
 	}
 
-	int32 uIdx = tIdx;
-	int32 dIdx = tIdx;
-
-	if (idx < tIdx)uIdx = tIdx - size;
-	else dIdx = tIdx + size;
-
-	if (abs(dIdx - idx) < abs(uIdx - idx))
-	{
-		aiPawn->SelectDown();
-		blackboardComp->SetValueAsString(SelectedSkillTag.SelectedKeyName, equippedSkillTags[(idx + 1) % size].ToString());
-	}
-	else
-	{
-		aiPawn->SelectUp();
-		blackboardComp->SetValueAsString(SelectedSkillTag.SelectedKeyName, equippedSkillTags[(idx - 1 + size) % size].ToString());
-	}
+	aiPawn->HoverSkillIcon(data->TargetSkillTag);
 
 	return EBTNodeResult::Succeeded;
 }
 
-FString UBTT_SelectSkill::GetStaticDescription() const
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////UBTT_SelectSkill_Click///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+UBTT_SelectSkill_Click::UBTT_SelectSkill_Click()
 {
-	return Super::GetStaticDescription();
+	NodeName = "SelectSkill_Click";
+
+	Data.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTT_SelectSkill_Click, Data), UTurnBasedBlackboardContainer::StaticClass());
+}
+
+EBTNodeResult::Type UBTT_SelectSkill_Click::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	Super::ExecuteTask(OwnerComp, NodeMemory);
+
+	UBlackboardComponent* blackboardComp = OwnerComp.GetBlackboardComponent();
+	if (!blackboardComp)
+	{
+		CLog::Print("UBTT_SelectSkill_Click::ExecuteTask blackboardComp cast failed!!");
+		return EBTNodeResult::Failed;
+	}
+
+	AAIController* controller = Cast<AAIController>(OwnerComp.GetOwner());
+	if (!controller)
+	{
+		CLog::Print("UBTT_SelectSkill_Click::ExecuteTask controller cast failed!!");
+		return EBTNodeResult::Failed;
+	}
+
+	ATurnBasedEnemy* aiPawn = Cast<ATurnBasedEnemy>(controller->GetPawn());
+	if (!aiPawn)
+	{
+		CLog::Print("UBTT_SelectSkill_Click::ExecuteTask aiPawn cast failed!!");
+		return EBTNodeResult::Failed;
+	}
+
+	UTurnBasedBlackboardContainer* data = Cast<UTurnBasedBlackboardContainer>(blackboardComp->GetValueAsObject(Data.SelectedKeyName));
+	if (!data)
+	{
+		CLog::Print("UBTT_SelectSkill_Click::ExecuteTask data cast failed!!");
+		return EBTNodeResult::Failed;
+	}
+
+	aiPawn->ClickSkillIcon(data->TargetSkillTag);
+
+	return EBTNodeResult::Succeeded;
 }

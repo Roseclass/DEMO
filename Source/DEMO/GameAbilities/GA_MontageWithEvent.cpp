@@ -105,9 +105,13 @@ void UGA_MontageWithEvent::EventReceived(FGameplayTag EventTag, FGameplayEventDa
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	else if (EventTag == NextMontageTriggerTag)
 	{
-		PlayKeyMontage();
-		PlaySubMontages();
-		++MontageDataIdx;
+		FTimerHandle WaitHandle;
+		GetWorld()->GetTimerManager().SetTimer(WaitHandle, FTimerDelegate::CreateLambda([&]()
+			{
+				PlayKeyMontage();
+				PlaySubMontages();
+				++MontageDataIdx;
+			}), MontageDatas[MontageDataIdx].StartDelay, false);
 		return;
 	}
 	else if (EventTag == NextCameraMoveTriggerTag)
